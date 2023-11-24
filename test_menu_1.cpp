@@ -42,6 +42,11 @@ namespace lib_menu {
 
 	namespace impl
 	{
+		struct tag_menu_node {};
+		struct tag_menu_leaf {};
+		struct tag_menu_header {};
+
+
 		auto node_if_hdl_entry = [](auto item, auto data)
 		{
 			item.on_entry(data);
@@ -105,6 +110,68 @@ namespace lib_menu {
 		constexpr size_t get_max_depth(std::tuple<Args...> &tuple) {
 			return get_max_depth(tuple, std::make_index_sequence<std::tuple_size<std::tuple<Args...>>::value>());
 		}
+
+		// 特定の型がstd::tupleに含まれているかを確認するテンプレート
+		template <typename Tuple, std::size_t Index>
+		struct tuple_contains_node_header;
+
+		// 基底ケース: タプルが空の場合
+		template <std::size_t Index>
+		struct tuple_contains_node_header<std::tuple<>, Index>
+		{
+			static const bool value = false;
+		};
+
+		// 再帰ケース: タプルが空でない場合
+		template <typename First, typename... Rest, std::size_t Index>
+		struct tuple_contains_node_header<std::tuple<First, Rest...>, Index>
+		{
+			static const bool value = std::is_same<typename First::tag, tag_menu_header>::value || tuple_contains_node_header<std::tuple<Rest...>, Index + 1>::value;
+		};
+
+		template <typename Tuple, std::size_t Index>
+		inline constexpr bool tuple_contains_node_header_v = tuple_contains_node_header<Tuple, Index>::value;
+
+		// 特定の条件を満たす型を取得するメタプログラム
+		template <typename... Types>
+		struct get_node_header;
+
+		// 再帰的なメタプログラム
+		template <typename First, typename... Rest>
+		struct get_node_header<First, Rest...>
+		{
+			// 条件を満たす場合、型を追加する
+			using type = typename std::conditional<std::is_same<typename First::tag, tag_menu_header>::value, // ここに条件を指定
+												   First,
+												   typename get_node_header<Rest...>::type>::type;
+		};
+
+		// ベースケース: タプルが空の場合
+		template <>
+		struct get_node_header<>
+		{
+			using type = void; // 空のタプルを返す
+		};
+
+		// 特定の型がstd::tupleに含まれているかを確認するテンプレート
+		template <typename Tuple, std::size_t Index>
+		struct node_header_pos_in_tuple;
+
+		// 基底ケース: タプルが空の場合
+		template <std::size_t Index>
+		struct node_header_pos_in_tuple<std::tuple<>, Index>
+		{
+			static constexpr size_t value = 0;
+		};
+
+		// 再帰ケース: タプルが空でない場合
+		template <typename First, typename... Rest, std::size_t Index>
+		struct node_header_pos_in_tuple<std::tuple<First, Rest...>, Index>
+		{
+			using type = std::enable_if_t<std::is_same<typename First::tag, tag_menu_header>::value>;
+			static constexpr size_t value = Index;
+		};
+
 	}
 
 	template <typename Tuple>
@@ -115,7 +182,7 @@ namespace lib_menu {
 		std::vector<impl::node_if> children_;
 		int select_idx_;
 		int confirm_idx_;
-		std::vector<impl::node_if> confirm_stack_;
+		std::vector<impl::node_if*> confirm_stack_;
 
 	public:
 		size_t depth;
@@ -161,6 +228,7 @@ namespace lib_menu {
 	template <typename Tuple>
 	struct menu_node
 	{
+		using tag = impl::tag_menu_node;
 		char const *label_;
 		size_t label_len_;
 		Tuple raw_tuple_;
@@ -198,6 +266,7 @@ namespace lib_menu {
 	template <typename T, size_t N, typename Tuple>
 	struct menu_node_dyn
 	{
+		using tag = impl::tag_menu_node;
 		using data_type = T;
 
 		char const *label_;
@@ -235,6 +304,7 @@ namespace lib_menu {
 	class menu_leaf
 	{
 	public:
+		using tag = impl::tag_menu_leaf;
 		using action_type = Act;
 		static constexpr size_t depth = 1;
 
@@ -288,6 +358,7 @@ namespace lib_menu {
 	class menu_leaf_dyn
 	{
 	public:
+		using tag = impl::tag_menu_leaf;
 		using action_type = Act;
 		using data_type = T;
 		static constexpr size_t depth = 1;
@@ -329,6 +400,23 @@ namespace lib_menu {
 		}
 	};
 
+	template <typename Act>
+	class menu_header
+	{
+	public:
+		using action_type = Act;
+		using tag = impl::tag_menu_header;
+
+	private:
+		action_type actor_;
+
+	public:
+		menu_header(Act &&actor) : actor_(std::move(actor))
+		{
+		}
+
+	};
+
 	namespace impl {
 
 		template <typename... Args>
@@ -367,33 +455,66 @@ namespace lib_menu {
 		}
 	}
 
-	template <typename... Args>
-	auto make_menu(Args &&...nodes) -> typename impl::make_menu_result_t<Args...>::type
+	template <typename T, typename... Args>
+	auto make_menu(menu_header<T> &&header, Args &&...nodes)
 	{
 		using result_type = typename impl::make_menu_result_t<Args...>::type;
-		return result_type{ std::make_tuple(std::forward<Args>(nodes)...) };
+		return result_type{std::make_tuple(std::forward<Args>(nodes)...)};
+	}
+
+	template <typename... Args>
+	auto make_menu(Args &&...nodes)
+	{
+		using result_type = typename impl::make_menu_result_t<Args...>::type;
+		return result_type{std::make_tuple(std::forward<Args>(nodes)...)};
+	}
+
+	template <typename T, size_t N, typename U, typename... Args>
+	auto node(T(&c)[N], menu_header<U> &&header, Args &&...nodes)
+	{
+		if constexpr (std::is_integral_v<T>)
+		{
+			// 固定文字列で表示するメニュー
+			auto new_tuple = std::make_tuple(std::forward<Args>(nodes)...);
+			return menu_node<decltype(new_tuple)>{c, std::move(new_tuple)};
+		}
+		else
+		{
+			// コンテナ(T(&c)[N])で動的に表示するメニュー
+			auto new_tuple = impl::make_menu_leaf_dyn(c[0], std::make_tuple(std::forward<Args>(nodes)...));
+			using result_type = menu_node_dyn<T, N, decltype(new_tuple)>;
+			return result_type{c, std::move(new_tuple)};
+		}
 	}
 
 	template <typename T, size_t N, typename... Args>
 	auto node(T(&c)[N], Args &&...nodes)
 	{
-		if constexpr (std::is_integral_v<T>) {
+		if constexpr (std::is_integral_v<T>)
+		{
 			// 固定文字列で表示するメニュー
 			auto new_tuple = std::make_tuple(std::forward<Args>(nodes)...);
 			return menu_node<decltype(new_tuple)>{c, std::move(new_tuple)};
 		}
-		else {
+		else
+		{
 			// コンテナ(T(&c)[N])で動的に表示するメニュー
 			auto new_tuple = impl::make_menu_leaf_dyn(c[0], std::make_tuple(std::forward<Args>(nodes)...));
 			using result_type = menu_node_dyn<T, N, decltype(new_tuple)>;
-			return result_type{ c, std::move(new_tuple) };
+			return result_type{c, std::move(new_tuple)};
 		}
-
 	}
 
-	template<typename T>
-	menu_leaf<T> leaf(char const* label, T&& actor) {
+	template <typename T>
+	menu_leaf<T> leaf(char const *label, T &&actor)
+	{
 		return menu_leaf<T>{label, actor};
+	}
+
+	template <typename T>
+	menu_header<T> header(T &&actor)
+	{
+		return menu_header<T>{std::forward<T>(actor)};
 	}
 }
 
@@ -412,8 +533,11 @@ data_node data_c[] = {
 namespace lm = lib_menu;
 
 auto menu_mng = lm::make_menu(
+	lm::header(int(0)),
 
 	lm::node("menu_1",
+		lm::header(int(111)),
+
 		lm::node(data_c,
 			lm::leaf("dyn_menu_1", 1),
 			lm::leaf("dyn_menu_2", 2),
