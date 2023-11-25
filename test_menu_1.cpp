@@ -49,7 +49,7 @@ namespace lib_menu {
 
 		auto node_if_hdl_entry = [](auto &item, auto data)
 		{
-			item.on_entry(data);
+			return item.on_entry(data);
 		};
 		auto node_if_hdl_exit = [](auto &item)
 		{
@@ -69,7 +69,8 @@ namespace lib_menu {
 		};
 		struct node_if
 		{
-			using entry_cb_t = std::function<void(void*)>;
+			using children_type = std::vector<node_if>;
+			using entry_cb_t = std::function<children_type*(void *)>;
 			using exit_cb_t = std::function<void()>;
 			using event_cb_t = std::function<void(event_t)>;
 			using render_cb_t = std::function<void()>;
@@ -82,15 +83,15 @@ namespace lib_menu {
 			get_label_t get_label;
 		};
 
-		template <typename Tuple>
-		auto make_node_if(Tuple &&tuple)
+		template <typename Node>
+		auto make_node_if(Node &&node)
 		{
 			return node_if{
-				[&](void *data) { node_if_hdl_entry(std::forward<Tuple>(tuple), data); },
-				[&]() { node_if_hdl_exit(std::forward<Tuple>(tuple)); },
-				[&](event_t event) { node_if_hdl_event(std::forward<Tuple>(tuple), event); },
-				[&]() { node_if_hdl_render(std::forward<Tuple>(tuple)); },
-				[&](RenderBuffer &buffer) { node_if_get_label(std::forward<Tuple>(tuple), buffer); }
+				[&](void *data) { return node_if_hdl_entry(std::forward<Node>(node), data); },
+				[&]() { node_if_hdl_exit(std::forward<Node>(node)); },
+				[&](event_t event) { node_if_hdl_event(std::forward<Node>(node), event); },
+				[&]() { node_if_hdl_render(std::forward<Node>(node)); },
+				[&](RenderBuffer &buffer) { node_if_get_label(std::forward<Node>(node), buffer); }
 			};
 		}
 
@@ -98,13 +99,6 @@ namespace lib_menu {
 		auto tuple_to_vec(std::tuple<Args...> &tuple, std::index_sequence<I...>)
 		{
 			return std::vector< node_if >{
-				// node_if{
-				// 	[&](void *data) { node_if_hdl_entry(std::get<I>(tuple), data); },
-				// 	[&]() { node_if_hdl_exit(std::get<I>(tuple)); },
-				// 	[&](event_t event) { node_if_hdl_event(std::get<I>(tuple), event); },
-				// 	[&]() { node_if_hdl_render(std::get<I>(tuple)); },
-				// 	[&](RenderBuffer &buffer) { node_if_get_label(std::get<I>(tuple), buffer); }
-				// }...
 				make_node_if(std::get<I>(tuple))...
 			};
 		}
@@ -226,41 +220,48 @@ namespace lib_menu {
 		}
 	};
 
-	template <typename H, typename Tuple>
+	template <typename Node>
 	class menu_mng
 	{
-		using header_type = menu_header<H>;
-
-		header_type header_;
-		Tuple raw_tuple_;
-		constexpr static size_t children_size_ = std::tuple_size<Tuple>::value;
-		std::vector<impl::node_if> children_;
+		Node node_;
+		impl::node_if self_;
 		int select_idx_;
 		int confirm_idx_;
 		std::vector<impl::node_if*> confirm_stack_;
+		impl::node_if* confirm_ptr_;
+		impl::node_if::children_type* children_ptr_;
+		size_t children_count_;
 
 	public:
 		size_t depth;
 
 	public:
-		menu_mng(header_type &&header, Tuple &&tuple) : header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), select_idx_(0), confirm_idx_(-1)
+		menu_mng(Node &&node) : node_(std::forward<Node>(node)), select_idx_(0), confirm_idx_(-1)
 		{
-			depth = impl::get_max_depth(raw_tuple_);
-			children_ = impl::tuple_to_vec(raw_tuple_);
+			depth = node_.depth;
 			confirm_stack_.reserve(depth);
-			//confirm_stack_.push_back(&children_);
+			self_ = impl::make_node_if(node_);
+			//
+			confirm_stack_.push_back(&self_);
+			confirm_ptr_ = &self_;
+			children_ptr_ = confirm_ptr_->on_entry(nullptr);
+			children_count_ = children_ptr_->size();
 		}
 
 		void on_entry(RenderBuffer &buffer)
 		{
-			// メニュー表示情報作成
-			for (auto &node : children_) {
-				node.get_label(buffer);
+			//
+			if (children_ptr_ != nullptr) {
+				// メニュー表示情報作成
+				for (auto &node : *children_ptr_)
+				{
+					node.get_label(buffer);
+				}
+				// 
+				confirm_ptr_->on_render();
+				// メニュー表示
+				on_render(buffer);
 			}
-			// メニュー初期表示
-			header_.on_render(nullptr);
-			// メニュー表示
-			on_render(buffer);
 		}
 
 		void on_exit()
@@ -276,7 +277,8 @@ namespace lib_menu {
 				break;
 			case event_t::SelectNext:
 				select_idx_++;
-				if (select_idx_ >= buff.pos) {
+				if (select_idx_ >= children_count_)
+				{
 					select_idx_ = 0;
 				}
 				on_render(buff);
@@ -284,13 +286,15 @@ namespace lib_menu {
 				break;
 			case event_t::SelectPrev:
 				if (select_idx_ == 0) {
-					select_idx_ = buff.pos - 1;
+					select_idx_ = children_count_ - 1;
 				}else{
 					select_idx_--;
 				}
 				on_render(buff);
 				break;
 			case event_t::Confirm:
+				// 選択中メニューで決定
+				check_confirm(buff, &(*children_ptr_)[select_idx_]);
 				break;
 			case event_t::Back:
 				break;
@@ -317,6 +321,22 @@ namespace lib_menu {
 			}
 			std::cout << std::endl;
 		}
+
+	private:
+		void check_confirm(RenderBuffer &buff, impl::node_if *child)
+		{
+			auto result = child->on_entry(nullptr);
+			if (result != nullptr)
+			{
+				// メニューに入る
+				confirm_stack_.push_back(child);
+				confirm_ptr_ = child;
+				children_ptr_ = result;
+				children_count_ = children_ptr_->size();
+				//
+				on_render(buff);
+			}
+		}
 	};
 
 	template <typename H, typename Tuple>
@@ -324,11 +344,12 @@ namespace lib_menu {
 	{
 		using header_type = menu_header<H>;
 		using tag = impl::tag_menu_node;
+		using children_type = impl::node_if::children_type;
 		char const *label_;
 		size_t label_len_;
 		header_type header_;
 		Tuple raw_tuple_;
-		std::vector<impl::node_if> children_;
+		children_type children_;
 		size_t depth;
 		int tgt_;
 
@@ -339,8 +360,9 @@ namespace lib_menu {
 			children_ = impl::tuple_to_vec(raw_tuple_);
 		}
 
-		void on_entry(void* ptr)
+		children_type* on_entry(void *ptr)
 		{
+			return &children_;
 		}
 		void on_exit()
 		{
@@ -350,6 +372,8 @@ namespace lib_menu {
 		}
 		void on_render()
 		{
+			//
+			header_.on_render(nullptr);
 		}
 
 		void get_label(RenderBuffer &buffer)
@@ -365,6 +389,7 @@ namespace lib_menu {
 		using tag = impl::tag_menu_node;
 		using data_type = T;
 		using header_type = menu_header<H>;
+		using children_type = impl::node_if::children_type;
 
 		char const *label_;
 		T(&cont_)[N];
@@ -380,8 +405,9 @@ namespace lib_menu {
 			children_ = impl::tuple_to_vec(raw_tuple_);
 		}
 
-		void on_entry(void *data)
+		children_type* on_entry(void *data)
 		{
+			return &children_;
 		}
 		void on_exit()
 		{
@@ -391,6 +417,8 @@ namespace lib_menu {
 		}
 		void on_render()
 		{
+			//
+			header_.on_render(nullptr);
 		}
 
 		void get_label(RenderBuffer &buffer)
@@ -404,6 +432,7 @@ namespace lib_menu {
 	public:
 		using tag = impl::tag_menu_leaf;
 		using action_type = Act;
+		using children_type = impl::node_if::children_type;
 		static constexpr size_t depth = 1;
 
 	private:
@@ -432,8 +461,9 @@ namespace lib_menu {
 			return std::move(actor_);
 		}
 
-		void on_entry(void *data)
+		children_type* on_entry(void *data)
 		{
+			return nullptr;
 		}
 		void on_exit()
 		{
@@ -459,6 +489,7 @@ namespace lib_menu {
 		using tag = impl::tag_menu_leaf;
 		using action_type = Act;
 		using data_type = T;
+		using children_type = impl::node_if::children_type;
 		static constexpr size_t depth = 1;
 
 	private:
@@ -477,9 +508,10 @@ namespace lib_menu {
 			label_len_ = std::strlen(label_);
 		}
 
-		void on_entry(void *data)
+		children_type* on_entry(void *data)
 		{
 			data_ = (data_type*)data;
+			return nullptr;
 		}
 		void on_exit()
 		{
@@ -534,9 +566,10 @@ namespace lib_menu {
 	template <typename T, typename... Args>
 	auto make_menu(menu_header<T> &&header, Args &&...nodes)
 	{
-		//auto node_ = node("root", std::forward<menu_header<T>>(header), std::make_tuple(std::forward<Args>(nodes)...);
-		using result_type = menu_mng<T, std::tuple<Args...>>;
-		return result_type{std::forward<menu_header<T>>(header), std::make_tuple(std::forward<Args>(nodes)...)};
+		auto new_tuple = std::make_tuple(std::forward<Args>(nodes)...);
+		auto node_ = menu_node<T, decltype(new_tuple)>{"root", std::forward<menu_header<T>>(header), std::move(new_tuple)};
+		//auto node_ = node("root", std::forward<menu_header<T>>(header), std::make_tuple(std::forward<Args>(nodes)...));
+		return menu_mng<decltype(node_)>(std::move(node_));
 	}
 
 	template <typename... Args>
@@ -597,13 +630,14 @@ data_node data_c[] = {
 struct header_root_menu
 {
 	void operator()(void* data) {
-
+		std::cout << "<header_root_menu>" << std::endl;
 	}
 };
 struct header_menu_1
 {
 	void operator()(void *data)
 	{
+		std::cout << "<header_menu_1>" << std::endl;
 	}
 };
 
@@ -646,17 +680,36 @@ auto menu_mng = lm::make_menu(
 	lm::leaf("Version", 14)
 );
 
+lm::RenderBuffer buff;
+
+void event_next()
+{
+	std::cout << "[event:[SelectNext]]" << std::endl;
+	menu_mng.on_event(lm::event_t::SelectNext, buff);
+}
+void event_prev()
+{
+	std::cout << "[event:[SelectPrev]]" << std::endl;
+	menu_mng.on_event(lm::event_t::SelectPrev, buff);
+}
+void event_confirm()
+{
+	std::cout << "[event:[Confirm]]" << std::endl;
+	menu_mng.on_event(lm::event_t::Confirm, buff);
+}
+
 int main() {
-	lm::RenderBuffer buff;
 
 	menu_mng.on_entry(buff);
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
-	menu_mng.on_event(lm::event_t::SelectPrev, buff);
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
+
+	event_next();
+	event_next();
+	event_next();
+	event_next();
+	event_next();
+	event_prev();
+	event_next();
+	event_confirm();
 
 	return 0;
 }
