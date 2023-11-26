@@ -6,25 +6,12 @@
 #include <type_traits>
 #include <algorithm>
 #include <cstring>
+#include <array>
 
 namespace lib_menu {
+	static constexpr size_t BufferRowMax = 50;
+	static constexpr size_t BufferColMax = 255;
 
-	struct RenderBuffer {
-		static constexpr size_t RowMax = 50;
-		static constexpr size_t ColMax = 255;
-
-		char buffer[RowMax][ColMax];
-		size_t pos;
-
-		RenderBuffer() : buffer{ 0 }, pos{ 0 } {
-
-		}
-	};
-
-	template <typename Tuple>
-	void add_buffer(Tuple& tuple)
-	{
-	}
 }
 
 
@@ -40,14 +27,91 @@ namespace lib_menu {
 		MAX,
 	};
 
+	enum class response_t {
+		None,
+		OK,				// 操作受理
+		NG,				// 操作拒否
+		ReqBack,		// 上位メニューに戻る
+
+		MAX
+	};
+
+	namespace impl {
+		template <std::size_t N, size_t I, std::size_t... Indices>
+		constexpr auto generateArray(std::index_sequence<Indices...>)
+		{
+			return std::array<size_t, N>{((void)Indices, I)...};
+		}
+
+		template <std::size_t N, size_t I>
+		constexpr auto generateArray()
+		{
+			return generateArray<N, I>(std::make_index_sequence<N>{});
+		}
+
+		// Helper function to concatenate two arrays
+		template <std::size_t... Indices1, std::size_t... Indices2, typename T, std::size_t N1, std::size_t N2>
+		constexpr auto concatenateArraysImpl3(const std::array<T, N1>& arr1, const std::array<T, N2>& arr2, std::index_sequence<Indices1...>, std::index_sequence<Indices2...>)
+		{
+			return std::array<T, N1 + N2>{arr1[Indices1]..., arr2[Indices2]...};
+		}
+
+		// Recursive function to concatenate multiple arrays
+		template <typename T, size_t TN, typename U, size_t UN>
+		constexpr auto concatenateArraysImpl2(const std::array<T, TN>& arr1, const std::array<U, UN>& arr2)
+		{
+			return concatenateArraysImpl3(arr1, arr2, std::make_index_sequence<TN>(), std::make_index_sequence<UN>());
+		}
+		// Recursive function to concatenate multiple arrays
+		template <typename T, typename U>
+		constexpr auto concatenateArraysImpl1(const T& arr1, const U& arr2)
+		{
+			return concatenateArraysImpl2(arr1, arr2);
+		}
+
+		// Recursive function to concatenate multiple arrays
+		template <typename T, typename U, typename... Arrays>
+		constexpr auto concatenateArraysImpl1(const T& arr1, const U& arr2, const Arrays &...arrays)
+		{
+			return concatenateArraysImpl1(concatenateArraysImpl3(arr1, arr2), concatenateArrays(arrays...));
+		}
+
+		// Recursive function to concatenate multiple arrays
+		template <typename T>
+		constexpr auto concatenateArrays(const T& arr)
+		{
+			return arr;
+		}
+
+		// Recursive function to concatenate multiple arrays
+		template <typename T, typename... Arrays>
+		constexpr auto concatenateArrays(const T& arr, const Arrays &...arrays)
+		{
+			return concatenateArraysImpl1(arr, concatenateArrays(arrays...));
+		}
+
+		template <typename... Args, std::size_t... I>
+		constexpr auto gen_array(std::tuple<Args...>& tuple, std::index_sequence<I...>)
+		{
+			return concatenateArrays(generateArray<std::tuple_element_t<I, std::tuple<Args...>>::ElemSize, I>()...);
+		}
+
+		template <typename... Args>
+		constexpr auto gen_array(std::tuple<Args...>& tuple)
+		{
+			return gen_array(tuple, std::make_index_sequence<std::tuple_size<std::tuple<Args...>>::value>());
+		}
+	}
+
 	namespace impl
 	{
 		struct tag_menu_node {};
 		struct tag_menu_leaf {};
 		struct tag_menu_header {};
 
+		struct DataInterface;
 
-		auto node_if_hdl_entry = [](auto& item, auto data)
+		auto node_if_hdl_entry = [](auto& item, DataInterface& data)
 			{
 				return item.on_entry(data);
 			};
@@ -59,26 +123,33 @@ namespace lib_menu {
 			{
 				item.on_event(event);
 			};
+		auto node_if_hdl_confirm = [](auto& item, DataInterface& data, size_t index)
+			{
+				return item.on_confirm(data, index);
+			};
 		auto node_if_hdl_render = [](auto& item)
 			{
 				item.on_render();
 			};
-		auto node_if_get_label = [](auto& item, auto& buffer)
+		auto node_if_get_label = [](auto& item, DataInterface& data)
 			{
-				item.get_label(buffer);
+				item.get_label(data);
 			};
+
 		struct node_if
 		{
 			using children_type = std::vector<node_if>;
-			using entry_cb_t = std::function<children_type* (void*)>;
+			using entry_cb_t = std::function<response_t(DataInterface&)>;
 			using exit_cb_t = std::function<void()>;
 			using event_cb_t = std::function<void(event_t)>;
+			using conrifm_cb_t = std::function<response_t(DataInterface&, size_t)>;
 			using render_cb_t = std::function<void()>;
-			using get_label_t = std::function<void(RenderBuffer&)>;
+			using get_label_t = std::function<void(DataInterface&)>;
 
 			entry_cb_t on_entry;
 			exit_cb_t on_exit;
 			event_cb_t on_event;
+			conrifm_cb_t on_confirm;
 			render_cb_t on_render;
 			get_label_t get_label;
 
@@ -94,6 +165,22 @@ namespace lib_menu {
 
 		};
 
+		struct DataInterface {
+
+			char buffer[BufferRowMax][BufferColMax];
+			size_t pos;
+
+			impl::node_if* next_node;
+			void* next_dyn_data;
+			impl::node_if::children_type* children_ptr;
+			size_t menu_count;
+
+			DataInterface() : buffer{ 0 }, pos{ 0 }, next_node(nullptr), next_dyn_data(nullptr), children_ptr(nullptr), menu_count(0) {
+
+			}
+		};
+
+
 		//template <typename Node>
 		//auto make_node_if(Node& node)
 		//{
@@ -107,15 +194,16 @@ namespace lib_menu {
 		//}
 
 
-		template <typename Tuple>
-		auto make_node_if(Tuple& tuple)
+		template <typename Node>
+		auto make_node_if(Node& node)
 		{
 			return node_if{
-				[&](void* data) { return node_if_hdl_entry(tuple, data); },
-				[&]() { node_if_hdl_exit(tuple); },
-				[&](event_t event) { node_if_hdl_event(tuple, event); },
-				[&]() { node_if_hdl_render(tuple); },
-				[&](RenderBuffer& buffer) { node_if_get_label(tuple, buffer); }
+				[&](DataInterface& data) { return node_if_hdl_entry(node, data); },
+				[&]() { node_if_hdl_exit(node); },
+				[&](event_t event) { node_if_hdl_event(node, event); },
+				[&](DataInterface& data, size_t index) { return node_if_hdl_confirm(node, data, index); },
+				[&]() { node_if_hdl_render(node); },
+				[&](DataInterface& data) { node_if_get_label(node, data); }
 			};
 		}
 
@@ -149,7 +237,6 @@ namespace lib_menu {
 		void init_node(Tuple& tuple, node_if::children_type& children) {
 			init_node(tuple, children, std::make_index_sequence<std::tuple_size<Tuple>::value>());
 		}
-
 
 
 		template <typename... Args, std::size_t... I>
@@ -269,13 +356,15 @@ namespace lib_menu {
 	{
 		//Node node_;
 		std::tuple<Node> raw_tuple_;
-		impl::node_if root_node_;
-		int select_idx_;
+		Node* root_node_;
+		impl::node_if root_node_if_;
+		size_t select_idx_;
 		int confirm_idx_;
 		std::vector<impl::node_if*> confirm_stack_;
 		impl::node_if* confirm_ptr_;
 		impl::node_if::children_type* children_ptr_;
 		size_t children_count_;
+		impl::DataInterface data_;
 
 	public:
 		size_t depth;
@@ -290,36 +379,26 @@ namespace lib_menu {
 		}
 
 		void init() {
-			Node& root = std::get<0>(raw_tuple_);
+			root_node_ = &(std::get<0>(raw_tuple_));
 			// tuple内全ノードを初期化
-			root.init();
+			root_node_->init();
 			// rootノードの操作I/Fを作成
-			root_node_ = impl::make_node_if(root);
-			// rootの子要素を取得
-			auto children = root_node_.on_entry(nullptr);
-			if (children == nullptr) {
-				throw std::runtime_error("menu_mng dont has child nodes.");
-			}
-			// rootノードを初期状態として登録
-			entry_menu(&root_node_, children);
+			root_node_if_ = impl::make_node_if(*root_node_);
 		}
 
-		void on_entry(RenderBuffer& buffer)
+		void on_entry()
 		{
-			//
-			if (children_ptr_ != nullptr) {
-				// 初期化
-				buffer.pos = 0;
-				// メニュー表示情報作成
-				for (auto& node : *children_ptr_)
-				{
-					node.get_label(buffer);
-				}
-				// 
-				confirm_ptr_->on_render();
-				// メニュー表示
-				on_render(buffer);
-			}
+			// 初期化
+			select_idx_ = 0;
+			data_.pos = 0;
+			confirm_stack_.clear();
+			// rootノードを初期状態として登録
+			data_.next_node = &root_node_if_;
+			data_.next_dyn_data = nullptr;
+			// rootノードに遷移処理
+			entry_menu();
+			// メニュー表示
+			on_render();
 		}
 
 		void on_exit()
@@ -327,7 +406,7 @@ namespace lib_menu {
 			select_idx_ = 0;
 			confirm_idx_ = -1;
 		}
-		void on_event(event_t event, RenderBuffer& buff)
+		void on_event(event_t event)
 		{
 			switch (event)
 			{
@@ -335,11 +414,11 @@ namespace lib_menu {
 				break;
 			case event_t::SelectNext:
 				select_idx_++;
-				if ((size_t)select_idx_ >= children_count_)
+				if (select_idx_ >= children_count_)
 				{
 					select_idx_ = 0;
 				}
-				on_render(buff);
+				on_render();
 
 				break;
 			case event_t::SelectPrev:
@@ -349,11 +428,11 @@ namespace lib_menu {
 				else {
 					select_idx_--;
 				}
-				on_render(buff);
+				on_render();
 				break;
 			case event_t::Confirm:
 				// 選択中メニューで決定
-				check_confirm(buff, &(*children_ptr_)[select_idx_]);
+				//check_confirm(buff, &(*children_ptr_)[select_idx_]);
 				break;
 			case event_t::Back:
 				break;
@@ -362,11 +441,32 @@ namespace lib_menu {
 			}
 		}
 
-		void on_render(RenderBuffer& buff)
+		void on_confirm() {
+			// 現ノードでconfirmイベントを実行
+			auto resp = confirm_ptr_->on_confirm(data_, select_idx_);
+			switch (resp) {
+			case response_t::OK:
+				// 操作受理でメニュー遷移
+				entry_menu();
+				break;
+
+			case response_t::ReqBack:
+				break;
+
+			default:
+				// その他:何もしない
+				break;
+			}
+		}
+
+		void on_render()
 		{
+			// 
+			confirm_ptr_->on_render();
+			// 
 			std::cout << "[menu]" << std::endl;
 			size_t idx;
-			for (idx = 0; idx < buff.pos; idx++)
+			for (idx = 0; idx < data_.pos; idx++)
 			{
 				if (idx == select_idx_)
 				{
@@ -377,31 +477,41 @@ namespace lib_menu {
 					std::cout << "  ";
 				}
 
-				std::cout << buff.buffer[idx] << std::endl;
+				std::cout << data_.buffer[idx] << std::endl;
 			}
 			std::cout << std::endl;
 		}
 
 	private:
-		void entry_menu(impl::node_if* next_node, impl::node_if::children_type* next_children) {
-			confirm_stack_.push_back(next_node);
-			confirm_ptr_ = next_node;
-			children_ptr_ = next_children;
-			children_count_ = children_ptr_->size();
+		void entry_menu() {
+			// 遷移先ノード設定
+			confirm_stack_.push_back(data_.next_node);
+			confirm_ptr_ = data_.next_node;
+			// 遷移処理
+			// 子要素を持つなら処理する
+			auto result = confirm_ptr_->on_entry(data_);
+			children_ptr_ = data_.children_ptr;
+			if (children_ptr_ != nullptr) {
+				children_count_ = data_.menu_count;
+			}
+			else {
+				children_count_ = 0;
+			}
+			// 表示バッファ更新
+			make_disp();
 		}
 
-		void check_confirm(RenderBuffer& buff, impl::node_if* child)
-		{
-			auto result = child->on_entry(nullptr);
-			if (result != nullptr)
-			{
-				// メニューに入る
-				confirm_stack_.push_back(child);
-				confirm_ptr_ = child;
-				children_ptr_ = result;
-				children_count_ = children_ptr_->size();
-				//
-				on_entry(buff);
+		void make_disp() {
+			//
+			if (children_ptr_ != nullptr) {
+				// 初期化
+				select_idx_ = 0;
+				data_.pos = 0;
+				// メニュー表示情報作成
+				for (auto& node : *children_ptr_)
+				{
+					node.get_label(data_);
+				}
 			}
 		}
 	};
@@ -412,20 +522,25 @@ namespace lib_menu {
 		using header_type = menu_header<H>;
 		using tag = impl::tag_menu_node;
 		using children_type = impl::node_if::children_type;
+		static constexpr size_t ElemSize = 1;
+
 		char const* label_;
 		size_t label_len_;
 		header_type header_;
 		Tuple raw_tuple_;
 		children_type children_;
+		size_t children_count_;
 		size_t depth;
 		int tgt_;
+		std::vector<size_t> index_table_;
+		size_t confirm_index_;
 
-		menu_node(char const* label, header_type&& header, Tuple&& tuple) : label_(label), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), tgt_(-1)
+		menu_node(char const* label, header_type&& header, Tuple&& tuple) : label_(label), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
 		{
 			label_len_ = std::strlen(label_);
 			depth = impl::get_max_depth(raw_tuple_) + 1;
-			//auto temp = impl::tuple_to_vec(raw_tuple_);
-			//children_.swap(temp);
+			auto array = impl::gen_array(raw_tuple_);
+			index_table_.assign(std::begin(array), std::end(array));
 		}
 
 		//menu_node(menu_node& node) = delete;
@@ -434,11 +549,13 @@ namespace lib_menu {
 
 		void init() {
 			impl::init_node(raw_tuple_, children_);
+			children_count_ = children_.size();
 		}
 
-		children_type* on_entry(void* ptr)
+		response_t on_entry(impl::DataInterface& data)
 		{
-			return &children_;
+			data.children_ptr = &children_;
+			return response_t::None;
 		}
 		void on_exit()
 		{
@@ -446,16 +563,31 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
+		response_t on_confirm(impl::DataInterface& data, size_t index) {
+			// 範囲チェックはnode_mngで実施済み
+			// childrenが存在するかだけチェックする
+			if (children_count_ == 0) {
+				return response_t::NG;
+			}
+
+			// 受理処理を実施
+			confirm_index_ = index;
+			size_t next_idx = index_table_[index];
+			data.next_node = &children_[next_idx];
+			data.next_dyn_data = nullptr;
+
+			return response_t::OK;
+		}
 		void on_render()
 		{
 			//
 			header_.on_render(nullptr);
 		}
 
-		void get_label(RenderBuffer& buffer)
+		void get_label(impl::DataInterface& data)
 		{
-			std::memcpy(buffer.buffer[buffer.pos], label_, label_len_ + 1);
-			buffer.pos++;
+			std::memcpy(data.buffer[data.pos], label_, label_len_ + 1);
+			data.pos++;
 		}
 	};
 
@@ -466,33 +598,38 @@ namespace lib_menu {
 		using data_type = T;
 		using header_type = menu_header<H>;
 		using children_type = impl::node_if::children_type;
+		static constexpr size_t ElemSize = N;
 
 		char const* label_;
 		T(&cont_)[N];
 		header_type header_;
 		Tuple raw_tuple_;
 		std::vector<impl::node_if> children_;
+		size_t children_count_;
 		size_t depth;
 		int tgt_;
+		std::vector<size_t> index_table_;
 
 		//menu_node_dyn(menu_node_dyn& node) = delete;
 		//menu_node_dyn(menu_node_dyn&& node) : label_(node.label_), cont_(node.cont_), raw_tuple_(std::move(node.raw_tuple_)), children_(std::move(node.children_)), depth(node.depth), tgt_(node.tgt_) {
 		//}
 
-		menu_node_dyn(T(&cont)[N], header_type&& header, Tuple&& tuple) : label_(nullptr), cont_(cont), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), tgt_(-1)
+		menu_node_dyn(T(&cont)[N], header_type&& header, Tuple&& tuple) : label_(nullptr), cont_(cont), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
 		{
 			depth = impl::get_max_depth(raw_tuple_) + 1;
-			//auto temp = impl::tuple_to_vec(raw_tuple_);
-			//children_.swap(temp);
+			auto array = impl::gen_array(raw_tuple_);
+			index_table_.assign(std::begin(array), std::end(array));
 		}
 
 		void init() {
 			impl::init_node(raw_tuple_, children_);
+			children_count_ = children_.size();
 		}
 
-		children_type* on_entry(void* data)
+		response_t on_entry(impl::DataInterface& data)
 		{
-			return &children_;
+			data.children_ptr = &children_;
+			return response_t::None;
 		}
 		void on_exit()
 		{
@@ -500,13 +637,29 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
+		response_t on_confirm(impl::DataInterface& data, size_t index) {
+			// 範囲チェック
+			if (index >= N) {
+				return response_t::NG;
+			}
+			// childrenが存在するかチェックする
+			if (children_count_ == 0) {
+				return response_t::NG;
+			}
+			// 選択データをチェック
+			if (!(bool)(cont_[index])) {
+				return response_t::NG;
+			}
+
+			return response_t::OK;
+		}
 		void on_render()
 		{
 			//
 			header_.on_render(nullptr);
 		}
 
-		void get_label(RenderBuffer& buffer)
+		void get_label(impl::DataInterface& data)
 		{
 		}
 	};
@@ -519,6 +672,7 @@ namespace lib_menu {
 		using action_type = Act;
 		using children_type = impl::node_if::children_type;
 		static constexpr size_t depth = 1;
+		static constexpr size_t ElemSize = 1;
 
 	private:
 		char const* label_;
@@ -547,9 +701,10 @@ namespace lib_menu {
 			return std::move(actor_);
 		}
 
-		children_type* on_entry(void* data)
+		response_t on_entry(impl::DataInterface& data)
 		{
-			return nullptr;
+			data.children_ptr = nullptr;
+			return response_t::None;
 		}
 		void on_exit()
 		{
@@ -557,14 +712,20 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
+		response_t on_confirm(impl::DataInterface& data, size_t index) {
+			auto result = response_t::None;
+
+
+			return result;
+		}
 		void on_render()
 		{
 		}
 
-		void get_label(RenderBuffer& buffer)
+		void get_label(impl::DataInterface& data)
 		{
-			std::memcpy(buffer.buffer[buffer.pos], label_, label_len_ + 1);
-			buffer.pos++;
+			std::memcpy(data.buffer[data.pos], label_, label_len_ + 1);
+			data.pos++;
 		}
 	};
 
@@ -577,6 +738,7 @@ namespace lib_menu {
 		using data_type = T;
 		using children_type = impl::node_if::children_type;
 		static constexpr size_t depth = 1;
+		static constexpr size_t ElemSize = 1;
 
 	private:
 		char const* label_;
@@ -595,10 +757,11 @@ namespace lib_menu {
 
 		}
 
-		children_type* on_entry(void* data)
+		response_t on_entry(impl::DataInterface& data)
 		{
-			data_ = (data_type*)data;
-			return nullptr;
+			data_ = (data_type*)data.next_dyn_data;
+			data.children_ptr = nullptr;
+			return response_t::None;
 		}
 		void on_exit()
 		{
@@ -606,14 +769,20 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
+		response_t on_confirm(impl::DataInterface& data, size_t index) {
+			auto result = response_t::None;
+
+
+			return result;
+		}
 		void on_render()
 		{
 		}
 
-		void get_label(RenderBuffer& buffer)
+		void get_label(impl::DataInterface& data)
 		{
-			std::memcpy(buffer.buffer[buffer.pos], label_, label_len_ + 1);
-			buffer.pos++;
+			std::memcpy(data.buffer[data.pos], label_, label_len_ + 1);
+			data.pos++;
 		}
 	};
 
@@ -706,6 +875,9 @@ namespace lib_menu {
 struct data_node {
 	char const* label;
 
+	operator bool() {
+		return label != nullptr;
+	}
 };
 
 data_node data_c[] = {
@@ -729,6 +901,8 @@ struct header_menu_1
 };
 
 namespace lm = lib_menu;
+
+auto menu_back = lm::leaf("[戻る]", 3);
 
 auto menu_mng = lm::make_menu(
 	lm::header(header_root_menu()),
@@ -767,27 +941,25 @@ auto menu_mng = lm::make_menu(
 	lm::leaf("Version", 14)
 );
 
-lm::RenderBuffer buff;
-
 void event_next()
 {
 	std::cout << "[event:[SelectNext]]" << std::endl;
-	menu_mng.on_event(lm::event_t::SelectNext, buff);
+	menu_mng.on_event(lm::event_t::SelectNext);
 }
 void event_prev()
 {
 	std::cout << "[event:[SelectPrev]]" << std::endl;
-	menu_mng.on_event(lm::event_t::SelectPrev, buff);
+	menu_mng.on_event(lm::event_t::SelectPrev);
 }
 void event_confirm()
 {
 	std::cout << "[event:[Confirm]]" << std::endl;
-	menu_mng.on_event(lm::event_t::Confirm, buff);
+	menu_mng.on_confirm();
 }
 
 int main() {
 	menu_mng.init();
-	menu_mng.on_entry(buff);
+	menu_mng.on_entry();
 
 	event_next();
 	event_next();
