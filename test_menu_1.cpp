@@ -22,6 +22,7 @@ namespace lib_menu {
 		{
 		}
 	};
+
 }
 
 
@@ -127,11 +128,9 @@ namespace lib_menu {
 		struct tag_menu_leaf {};
 		struct tag_menu_header {};
 
-		struct data_interface;
-
-		auto node_if_hdl_entry = [](auto& item, data_interface& data)
+		auto node_if_hdl_entry = [](auto& item)
 			{
-				return item.on_entry(data);
+				return item.on_entry();
 			};
 		auto node_if_hdl_exit = [](auto& item)
 			{
@@ -141,28 +140,28 @@ namespace lib_menu {
 			{
 				item.on_event(event);
 			};
-		auto node_if_hdl_confirm = [](auto& item, data_interface& data, size_t index)
+		auto node_if_hdl_confirm = [](auto& item, size_t index)
 			{
-				return item.on_confirm(data, index);
+				return item.on_confirm(index);
 			};
 		auto node_if_hdl_render = [](auto& item)
 			{
 				item.on_render();
 			};
-		auto node_if_get_label = [](auto& item, data_interface& data)
+		auto node_if_get_label = [](auto& item)
 			{
-				item.get_label(data);
+				item.get_label();
 			};
 
 		struct node_if
 		{
 			using children_type = std::vector<node_if>;
-			using entry_cb_t = std::function<response_t(data_interface&)>;
+			using entry_cb_t = std::function<response_t()>;
 			using exit_cb_t = std::function<void()>;
 			using event_cb_t = std::function<void(event_t)>;
-			using conrifm_cb_t = std::function<response_t(data_interface&, size_t)>;
+			using conrifm_cb_t = std::function<response_t(size_t)>;
 			using render_cb_t = std::function<void()>;
-			using get_label_t = std::function<void(data_interface&)>;
+			using get_label_t = std::function<void()>;
 
 			entry_cb_t on_entry;
 			exit_cb_t on_exit;
@@ -183,18 +182,6 @@ namespace lib_menu {
 
 		};
 
-		struct data_interface {
-			impl::node_if* next_node;
-			void* next_dyn_data;
-			impl::node_if::children_type* children_ptr;
-			size_t menu_count;
-
-			data_interface() : next_node(nullptr), next_dyn_data(nullptr), children_ptr(nullptr), menu_count(0)
-			{
-			}
-		};
-
-
 		//template <typename Node>
 		//auto make_node_if(Node& node)
 		//{
@@ -207,17 +194,28 @@ namespace lib_menu {
 		//	};
 		//}
 
+		struct data_interface {
+			impl::node_if* next_node;
+			void* next_dyn_data;
+			impl::node_if::children_type* children_ptr;
+			size_t menu_count;
+
+			data_interface() : next_node(nullptr), next_dyn_data(nullptr), children_ptr(nullptr), menu_count(0)
+			{
+			}
+		};
+
 
 		template <typename Node>
 		auto make_node_if(Node& node)
 		{
 			return node_if{
-				[&](data_interface& data) { return node_if_hdl_entry(node, data); },
+				[&]() { return node_if_hdl_entry(node); },
 				[&]() { node_if_hdl_exit(node); },
 				[&](event_t event) { node_if_hdl_event(node, event); },
-				[&](data_interface& data, size_t index) { return node_if_hdl_confirm(node, data, index); },
+				[&](size_t index) { return node_if_hdl_confirm(node, index); },
 				[&]() { node_if_hdl_render(node); },
-				[&](data_interface& data) { node_if_get_label(node, data); }
+				[&]() { node_if_get_label(node); }
 			};
 		}
 
@@ -472,7 +470,7 @@ namespace lib_menu {
 
 		void on_confirm() {
 			// 現ノードでconfirmイベントを実行
-			auto resp = confirm_ptr_->on_confirm(data_, select_idx_);
+			auto resp = confirm_ptr_->on_confirm(select_idx_);
 			switch (resp) {
 			case response_t::OK:
 				// 操作受理でメニュー遷移
@@ -518,7 +516,7 @@ namespace lib_menu {
 			confirm_ptr_ = data_.next_node;
 			// 遷移処理
 			// 子要素を持つなら処理する
-			auto result = confirm_ptr_->on_entry(data_);
+			auto result = confirm_ptr_->on_entry();
 			children_ptr_ = data_.children_ptr;
 			if (children_ptr_ != nullptr) {
 				children_count_ = data_.menu_count;
@@ -539,7 +537,7 @@ namespace lib_menu {
 				// メニュー表示情報作成
 				for (auto& node : *children_ptr_)
 				{
-					node.get_label(data_);
+					node.get_label();
 				}
 			}
 		}
@@ -588,9 +586,9 @@ namespace lib_menu {
 			children_count_ = children_.size();
 		}
 
-		response_t on_entry(impl::data_interface& data)
+		response_t on_entry()
 		{
-			data.children_ptr = &children_;
+			data_if_->children_ptr = &children_;
 			return response_t::None;
 		}
 		void on_exit()
@@ -599,7 +597,7 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
-		response_t on_confirm(impl::data_interface& data, size_t index)
+		response_t on_confirm(size_t index)
 		{
 			// 範囲チェックはnode_mngで実施済み
 			// childrenが存在するかだけチェックする
@@ -610,8 +608,8 @@ namespace lib_menu {
 			// 受理処理を実施
 			confirm_index_ = index;
 			size_t next_idx = index_table_[index];
-			data.next_node = &children_[next_idx];
-			data.next_dyn_data = nullptr;
+			data_if_->next_node = &children_[next_idx];
+			data_if_->next_dyn_data = nullptr;
 
 			return response_t::OK;
 		}
@@ -621,7 +619,7 @@ namespace lib_menu {
 			header_.on_render(nullptr);
 		}
 
-		void get_label(impl::data_interface& data)
+		void get_label()
 		{
 			std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
 			buff_if_->pos++;
@@ -670,9 +668,9 @@ namespace lib_menu {
 			children_count_ = children_.size();
 		}
 
-		response_t on_entry(impl::data_interface& data)
+		response_t on_entry()
 		{
-			data.children_ptr = &children_;
+			data_if_->children_ptr = &children_;
 			return response_t::None;
 		}
 		void on_exit()
@@ -681,7 +679,7 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
-		response_t on_confirm(impl::data_interface& data, size_t index)
+		response_t on_confirm(size_t index)
 		{
 			// 範囲チェック
 			if (index >= N) {
@@ -704,7 +702,7 @@ namespace lib_menu {
 			header_.on_render(nullptr);
 		}
 
-		void get_label(impl::data_interface& data)
+		void get_label()
 		{
 		}
 	};
@@ -740,9 +738,10 @@ namespace lib_menu {
 			data_if_ = data_if;
 		}
 
-		char const* get_label() {
+		char const* raw_label() {
 			return label_;
 		}
+
 		action_type& get_actor()
 		{
 			return actor_;
@@ -751,9 +750,9 @@ namespace lib_menu {
 			return std::move(actor_);
 		}
 
-		response_t on_entry(impl::data_interface& data)
+		response_t on_entry()
 		{
-			data.children_ptr = nullptr;
+			data_if_->children_ptr = nullptr;
 			return response_t::None;
 		}
 		void on_exit()
@@ -762,7 +761,7 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
-		response_t on_confirm(impl::data_interface& data, size_t index)
+		response_t on_confirm(size_t index)
 		{
 			auto result = response_t::None;
 
@@ -773,7 +772,7 @@ namespace lib_menu {
 		{
 		}
 
-		void get_label(impl::data_interface& data)
+		void get_label()
 		{
 			std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
 			buff_if_->pos++;
@@ -805,7 +804,7 @@ namespace lib_menu {
 
 	public:
 		menu_leaf_dyn(base_leaf_type& leaf) = delete;
-		menu_leaf_dyn(base_leaf_type&& leaf) : label_(leaf.get_label()), actor_(leaf.move_actor()), data_(nullptr)
+		menu_leaf_dyn(base_leaf_type&& leaf) : label_(leaf.raw_label()), actor_(leaf.move_actor()), data_(nullptr)
 		{
 			label_len_ = std::strlen(label_);
 		}
@@ -815,10 +814,10 @@ namespace lib_menu {
 			data_if_ = data_if;
 		}
 
-		response_t on_entry(impl::data_interface& data)
+		response_t on_entry()
 		{
-			data_ = (data_type*)data.next_dyn_data;
-			data.children_ptr = nullptr;
+			data_ = (data_type*)data_if_->next_dyn_data;
+			data_if_->children_ptr = nullptr;
 			return response_t::None;
 		}
 		void on_exit()
@@ -827,7 +826,7 @@ namespace lib_menu {
 		void on_event(event_t event)
 		{
 		}
-		response_t on_confirm(impl::data_interface& data, size_t index)
+		response_t on_confirm(size_t index)
 		{
 			auto result = response_t::None;
 
@@ -838,7 +837,7 @@ namespace lib_menu {
 		{
 		}
 
-		void get_label(impl::data_interface& data)
+		void get_label()
 		{
 			std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
 			buff_if_->pos++;
