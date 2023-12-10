@@ -596,18 +596,25 @@ namespace lib_menu {
 		}
 	};
 
-	template <typename BuffIf, typename DataIf, typename Header, typename Tuple>
+	template <typename T, size_t N, typename BuffIf, typename DataIf, typename Header, typename Tuple>
 	struct menu_node
 	{
 		using tag = impl::tag_menu_node;
+		using data_type = T;
 		using buff_if_type = BuffIf;
 		using data_if_type = DataIf;
 		using header_type = menu_header<Header>;
 		using children_type = impl::node_if::children_type;
-		static constexpr size_t ElemSize = 1;
+		static constexpr size_t ElemSize = N;
+		static constexpr bool IsDynamic = (N > 1);
 
+		// 固定ラベル表示ノードデータ
 		char const* label_;
 		size_t label_len_;
+		// 配列表示ノードデータ
+		T(*cont_)[N];
+
+		// 共通データ
 		buff_if_type* buff_if_;
 		data_if_type* data_if_;
 		header_type header_;
@@ -618,20 +625,39 @@ namespace lib_menu {
 		int tgt_;
 		std::vector<impl::menu_item_info> index_table_;
 		size_t confirm_index_;
+		//
+		size_t cont_index_;
 
+		//menu_node(menu_node& node) = delete;
+		//menu_node(menu_node&& node) : label_(node.label_), cont_(node.cont_), raw_tuple_(std::move(node.raw_tuple_)), children_(std::move(node.children_)), depth(node.depth), tgt_(node.tgt_) {
+		//}
 		menu_node(char const* label, header_type&& header, Tuple&& tuple)
-			: label_(label), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
+			: label_(label), cont_(nullptr), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
 		{
 			label_len_ = std::strlen(label_);
+			//depth = impl::get_max_depth(raw_tuple_) + 1;
+			//auto array = impl::gen_array(raw_tuple_);
+			//index_table_.assign(std::begin(array), std::end(array));
+			//children_count_ = index_table_.size();
+			init_impl();
+		}
+
+		menu_node(T(&cont)[N], header_type&& header, Tuple&& tuple)
+			: label_(nullptr), cont_(&cont), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
+		{
+			//depth = impl::get_max_depth(raw_tuple_) + 1;
+			//auto array = impl::gen_array(raw_tuple_);
+			//index_table_.assign(std::begin(array), std::end(array));
+			//children_count_ = index_table_.size();
+			init_impl();
+		}
+
+		void init_impl() {
 			depth = impl::get_max_depth(raw_tuple_) + 1;
 			auto array = impl::gen_array(raw_tuple_);
 			index_table_.assign(std::begin(array), std::end(array));
 			children_count_ = index_table_.size();
 		}
-
-		//menu_node(menu_node& node) = delete;
-		//menu_node(menu_node&& node) : label_(node.label_), header_(std::move(node.header_)), raw_tuple_(std::move(node.raw_tuple_)), tgt_(node.tgt_), label_len_(node.label_len_), depth(node.depth), children_(std::move(node.children_)) {
-		//}
 
 		void init(buff_if_type* buff_if, data_if_type* data_if)
 		{
@@ -645,6 +671,16 @@ namespace lib_menu {
 		{
 			// 自分の情報を通知
 			export_info();
+
+			if constexpr (IsDynamic) {
+				// 上位からの情報を取り込む
+				cont_index_ = data_if_->dyn_index;
+				// 選択データチェック
+				if (!(*cont_)[cont_index_]) {
+					return response_t::NG;
+				}
+			}
+			//
 			return response_t::None;
 		}
 		void on_exit()
@@ -657,131 +693,11 @@ namespace lib_menu {
 		response_t on_confirm(size_t index)
 		{
 			// 範囲チェックはnode_mngで実施済み
-			// childrenが存在するかだけチェックする
-			if (children_count_ == 0)
-			{
-				return response_t::NG;
-			}
-
-			// 受理処理を実施
-			// 最後に選択したメニューを記憶
-			confirm_index_ = index;
-			// 遷移先ノードを設定
-			auto next_node_info = index_table_[index];
-			if (next_node_info.is_dyn) {
-				data_if_->dyn_index = next_node_info.container_index;
-			}
-			data_if_->next_node = &children_[next_node_info.tuple_index];
-			data_if_->next_dyn_data = nullptr;
-
-			return response_t::OK;
-		}
-		void on_back()
-		{
-			export_info();
-		}
-		void on_render()
-		{
-			//
-			header_.on_render(nullptr);
-		}
-
-		void get_label()
-		{
-			std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
-			buff_if_->pos++;
-		}
-
-		void export_info()
-		{
-			data_if_->children_ptr = &children_;
-			data_if_->menu_count = children_count_;
-			data_if_->select_index = confirm_index_;
-		}
-	};
-
-	template <typename T, size_t N, typename BuffIf, typename DataIf, typename Header, typename Tuple>
-	struct menu_node_dyn
-	{
-		using tag = impl::tag_menu_node;
-		using data_type = T;
-		using buff_if_type = BuffIf;
-		using data_if_type = DataIf;
-		using header_type = menu_header<Header>;
-		using children_type = impl::node_if::children_type;
-		static constexpr size_t ElemSize = N;
-
-		char const* label_;
-		T(&cont_)[N];
-		buff_if_type* buff_if_;
-		data_if_type* data_if_;
-		header_type header_;
-		Tuple raw_tuple_;
-		std::vector<impl::node_if> children_;
-		size_t children_count_;
-		size_t depth;
-		int tgt_;
-		std::vector<impl::menu_item_info> index_table_;
-		size_t confirm_index_;
-		//
-		size_t cont_index_;
-
-		//menu_node_dyn(menu_node_dyn& node) = delete;
-		//menu_node_dyn(menu_node_dyn&& node) : label_(node.label_), cont_(node.cont_), raw_tuple_(std::move(node.raw_tuple_)), children_(std::move(node.children_)), depth(node.depth), tgt_(node.tgt_) {
-		//}
-
-		menu_node_dyn(T(&cont)[N], header_type&& header, Tuple&& tuple) : label_(nullptr), cont_(cont), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
-		{
-			depth = impl::get_max_depth(raw_tuple_) + 1;
-			auto array = impl::gen_array(raw_tuple_);
-			index_table_.assign(std::begin(array), std::end(array));
-			children_count_ = index_table_.size();
-		}
-
-		void init(buff_if_type* buff_if, data_if_type* data_if)
-		{
-			buff_if_ = buff_if;
-			data_if_ = data_if;
-
-			impl::init_node(buff_if_, data_if_, raw_tuple_, children_);
-		}
-
-		response_t on_entry()
-		{
-			export_info();
-			// import_info
-			cont_index_ = data_if_->dyn_index;
-			// 選択データチェック
-			if (!cont_[cont_index_]) {
-				return response_t::NG;
-			}
-			//
-			return response_t::None;
-		}
-		void on_exit()
-		{
-			confirm_index_ = 0;
-		}
-		void on_event(event_t event)
-		{
-		}
-		response_t on_confirm(size_t index)
-		{
-			// 範囲チェック
-			if (index >= N)
-			{
-				return response_t::NG;
-			}
 			// childrenが存在するかチェックする
 			if (children_count_ == 0)
 			{
 				return response_t::NG;
 			}
-			// 選択データをチェック
-			if (!(bool)(cont_[index]))
-			{
-				return response_t::NG;
-			}
 
 			// 受理処理を実施
 			// 最後に選択したメニューを記憶
@@ -808,8 +724,14 @@ namespace lib_menu {
 
 		void get_label()
 		{
-			for (size_t idx = 0; idx < ElemSize; idx++) {
-				cont_[idx].get_label(buff_if_->buffer[buff_if_->pos], buff_if_type::BufferColMax);
+			if constexpr (IsDynamic) {
+				for (size_t idx = 0; idx < ElemSize; idx++) {
+					(*cont_)[idx].get_label(buff_if_->buffer[buff_if_->pos], buff_if_type::BufferColMax);
+					buff_if_->pos++;
+				}
+			}
+			else {
+				std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
 				buff_if_->pos++;
 			}
 		}
@@ -1001,7 +923,8 @@ namespace lib_menu {
 		static auto make_menu(buff_if_type& buffer, menu_header<Header>&& header, Args &&...nodes)
 		{
 			auto new_tuple = std::make_tuple(std::forward<Args>(nodes)...);
-			auto node_ = menu_node<buff_if_type, data_if_type, Header, decltype(new_tuple)>{ "root", std::forward<menu_header<Header>>(header), std::move(new_tuple) };
+			using result_type = menu_node<int, 1, buff_if_type, data_if_type, Header, decltype(new_tuple)>;
+			auto node_ = result_type{ "root", std::forward<menu_header<Header>>(header), std::move(new_tuple) };
 			return menu_mng<buff_if_type, data_if_type, decltype(node_)>(buffer, std::move(node_));
 		}
 
@@ -1009,7 +932,8 @@ namespace lib_menu {
 		static auto make_menu(menu_header<Header>&& header, Args &&...nodes)
 		{
 			auto new_tuple = std::make_tuple(std::forward<Args>(nodes)...);
-			auto node_ = menu_node<buff_if_type, data_if_type, Header, decltype(new_tuple)>{ "root", std::forward<menu_header<Header>>(header), std::move(new_tuple) };
+			using result_type = menu_node<int, 1, buff_if_type, data_if_type, Header, decltype(new_tuple)>;
+			auto node_ = result_type{ "root", std::forward<menu_header<Header>>(header), std::move(new_tuple) };
 			return menu_mng<buff_if_type, data_if_type, decltype(node_)>(std::make_unique<buff_if_type>(), std::move(node_));
 		}
 
@@ -1026,13 +950,14 @@ namespace lib_menu {
 			{
 				// 固定文字列で表示するメニュー
 				auto new_tuple = std::make_tuple(std::forward<Args>(nodes)...);
-				return menu_node<buff_if_type, data_if_type, Header, decltype(new_tuple)>{c, std::forward<menu_header<Header>>(header), std::move(new_tuple)};
+				using result_type = menu_node<int, 1, buff_if_type, data_if_type, Header, decltype(new_tuple)>;
+				return result_type{c, std::forward<menu_header<Header>>(header), std::move(new_tuple)};
 			}
 			else
 			{
 				// コンテナ(T(&c)[N])で動的に表示するメニュー
 				auto new_tuple = impl::make_menu_leaf_dyn<buff_if_type, data_if_type>(c[0], std::make_tuple(std::forward<Args>(nodes)...));
-				using result_type = menu_node_dyn<T, N, buff_if_type, data_if_type, Header, decltype(new_tuple)>;
+				using result_type = menu_node<T, N, buff_if_type, data_if_type, Header, decltype(new_tuple)>;
 				return result_type{ c, std::forward<menu_header<Header>>(header), std::move(new_tuple) };
 			}
 		}
