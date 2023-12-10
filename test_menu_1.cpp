@@ -9,12 +9,16 @@
 #include <array>
 #include <memory>
 
-namespace lib_menu {
+namespace lib_menu
+{
 	static constexpr size_t BufferRowMax = 50;
 	static constexpr size_t BufferColMax = 255;
 
 	struct buffer_interface
 	{
+		static constexpr size_t BufferRowMax = BufferRowMax;
+		static constexpr size_t BufferColMax = BufferColMax;
+
 		char buffer[BufferRowMax][BufferColMax];
 		size_t pos;
 
@@ -22,9 +26,7 @@ namespace lib_menu {
 		{
 		}
 	};
-
 }
-
 
 namespace lib_menu {
 
@@ -48,10 +50,18 @@ namespace lib_menu {
 	};
 
 	namespace impl {
+		// menu_node_dynにより表示メニュー項目数とmenu_node_*タプル要素数がずれる
+		// その差を吸収するための情報構造体
+		struct menu_item_info {
+			size_t tuple_index;	// メニュー項目の位置と対応するtupleのノード位置をひもづける
+			size_t container_index;
+			bool is_dyn;
+		};
+
 		template <std::size_t N, size_t I, std::size_t... Indices>
 		constexpr auto generateArray(std::index_sequence<Indices...>)
 		{
-			return std::array<size_t, N>{((void)Indices, I)...};
+			return std::array<menu_item_info, N>{ menu_item_info{ I, Indices, N > 1 }... };
 		}
 
 		template <std::size_t N, size_t I>
@@ -128,34 +138,34 @@ namespace lib_menu {
 		struct tag_menu_leaf {};
 		struct tag_menu_header {};
 
-		auto node_if_hdl_entry = [](auto &item)
-		{
-			return item.on_entry();
-		};
-		auto node_if_hdl_exit = [](auto &item)
-		{
-			item.on_exit();
-		};
-		auto node_if_hdl_event = [](auto &item, event_t event)
-		{
-			item.on_event(event);
-		};
-		auto node_if_hdl_confirm = [](auto &item, size_t index)
-		{
-			return item.on_confirm(index);
-		};
-		auto node_if_hdl_back = [](auto &item)
-		{
-			return item.on_back();
-		};
-		auto node_if_hdl_render = [](auto &item)
-		{
-			item.on_render();
-		};
-		auto node_if_get_label = [](auto &item)
-		{
-			item.get_label();
-		};
+		auto node_if_hdl_entry = [](auto& item)
+			{
+				return item.on_entry();
+			};
+		auto node_if_hdl_exit = [](auto& item)
+			{
+				item.on_exit();
+			};
+		auto node_if_hdl_event = [](auto& item, event_t event)
+			{
+				item.on_event(event);
+			};
+		auto node_if_hdl_confirm = [](auto& item, size_t index)
+			{
+				return item.on_confirm(index);
+			};
+		auto node_if_hdl_back = [](auto& item)
+			{
+				return item.on_back();
+			};
+		auto node_if_hdl_render = [](auto& item)
+			{
+				item.on_render();
+			};
+		auto node_if_get_label = [](auto& item)
+			{
+				item.get_label();
+			};
 
 		struct node_if
 		{
@@ -179,13 +189,17 @@ namespace lib_menu {
 
 		struct data_interface
 		{
-			impl::node_if *next_node;
-			void *next_dyn_data;
-			impl::node_if::children_type *children_ptr;
+			// childからparentに渡すデータ
+			impl::node_if* next_node;
+			impl::node_if::children_type* children_ptr;
 			size_t menu_count;
 			size_t select_index;
+			// parentからchildに渡すデータ
+			void* next_dyn_data;
+			size_t dyn_index;
 
-			data_interface() : next_node(nullptr), next_dyn_data(nullptr), children_ptr(nullptr), menu_count(0), select_index(0)
+
+			data_interface() : next_node(nullptr), next_dyn_data(nullptr), children_ptr(nullptr), menu_count(0), select_index(0), dyn_index(0)
 			{
 			}
 		};
@@ -220,28 +234,28 @@ namespace lib_menu {
 		}
 
 		template <typename BuffIf, typename DataIf, typename Tuple, std::size_t... I>
-		void init_node(BuffIf *buff_if, DataIf *data_if, Tuple &tuple, node_if::children_type &children, std::index_sequence<I...>)
+		void init_node(BuffIf* buff_if, DataIf* data_if, Tuple& tuple, node_if::children_type& children, std::index_sequence<I...>)
 		{
 			// 子要素をすべてinit
 			auto dummy = {
-				(std::get<I>(tuple).init(buff_if, data_if), 0)...};
+				(std::get<I>(tuple).init(buff_if, data_if), 0)... };
 			// init後にchildを作成
 			auto temp = tuple_to_vec(tuple);
 			children.swap(temp);
 		}
 		template <typename BuffIf, typename DataIf, typename Tuple>
-		void init_node(BuffIf *buff_if, DataIf *data_if, Tuple &tuple, node_if::children_type &children)
+		void init_node(BuffIf* buff_if, DataIf* data_if, Tuple& tuple, node_if::children_type& children)
 		{
 			init_node(buff_if, data_if, tuple, children, std::make_index_sequence<std::tuple_size<Tuple>::value>());
 		}
 
 		template <typename... Args, std::size_t... I>
-		constexpr size_t get_max_depth(std::tuple<Args...> &tuple, std::index_sequence<I...>)
+		constexpr size_t get_max_depth(std::tuple<Args...>& tuple, std::index_sequence<I...>)
 		{
-			return std::max({std::get<I>(tuple).depth...});
+			return std::max({ std::get<I>(tuple).depth... });
 		}
 		template <typename... Args>
-		constexpr size_t get_max_depth(std::tuple<Args...> &tuple)
+		constexpr size_t get_max_depth(std::tuple<Args...>& tuple)
 		{
 			return get_max_depth(tuple, std::make_index_sequence<std::tuple_size<std::tuple<Args...>>::value>());
 		}
@@ -320,11 +334,11 @@ namespace lib_menu {
 		action_type actor_;
 
 	public:
-		menu_header(Act &&actor) : actor_(std::move(actor))
+		menu_header(Act&& actor) : actor_(std::move(actor))
 		{
 		}
 
-		void on_render(void *data)
+		void on_render(void* data)
 		{
 			actor_(data);
 		}
@@ -339,11 +353,11 @@ namespace lib_menu {
 		menu_header()
 		{
 		}
-		menu_header(menu_header<void> &&)
+		menu_header(menu_header<void>&&)
 		{
 		}
 
-		void on_render(void *)
+		void on_render(void*)
 		{
 		}
 	};
@@ -375,16 +389,16 @@ namespace lib_menu {
 	public:
 		menu_mng(Node& node) = delete;
 
-		menu_mng(Node &&node) : raw_tuple_{std::forward<Node>(node)}, select_idx_(0), confirm_idx_(-1)
+		menu_mng(Node&& node) : raw_tuple_{ std::forward<Node>(node) }, select_idx_(0), confirm_idx_(-1)
 		{
 			depth = node.depth;
 			confirm_stack_.reserve(depth);
 		}
-		menu_mng(buff_if_type &buff, Node &&node) : menu_mng(std::forward<Node>(node))
+		menu_mng(buff_if_type& buff, Node&& node) : menu_mng(std::forward<Node>(node))
 		{
 			buff_ptr_ = &buff;
 		}
-		menu_mng(std::unique_ptr<buff_if_type> &&buff, Node &&node) : menu_mng(std::forward<Node>(node))
+		menu_mng(std::unique_ptr<buff_if_type>&& buff, Node&& node) : menu_mng(std::forward<Node>(node))
 		{
 			buff_ = std::move(buff);
 			buff_ptr_ = buff_.get();
@@ -526,6 +540,10 @@ namespace lib_menu {
 				on_req_back();
 				break;
 
+			case response_t::NG:
+				// entry NG
+				break;
+
 			default:
 				// その他は遷移確定
 				exec_entry();
@@ -563,14 +581,14 @@ namespace lib_menu {
 
 		void make_disp()
 		{
+			// 初期化
+			select_idx_ = 0;
+			buff_ptr_->pos = 0;
 			//
 			if (children_ptr_ != nullptr)
 			{
-				// 初期化
-				select_idx_ = 0;
-				buff_ptr_->pos = 0;
 				// メニュー表示情報作成
-				for (auto &node : *children_ptr_)
+				for (auto& node : *children_ptr_)
 				{
 					node.get_label();
 				}
@@ -598,29 +616,29 @@ namespace lib_menu {
 		size_t children_count_;
 		size_t depth;
 		int tgt_;
-		std::vector<size_t> index_table_;
+		std::vector<impl::menu_item_info> index_table_;
 		size_t confirm_index_;
 
-		menu_node(char const *label, header_type &&header, Tuple &&tuple)
+		menu_node(char const* label, header_type&& header, Tuple&& tuple)
 			: label_(label), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
 		{
 			label_len_ = std::strlen(label_);
 			depth = impl::get_max_depth(raw_tuple_) + 1;
 			auto array = impl::gen_array(raw_tuple_);
 			index_table_.assign(std::begin(array), std::end(array));
+			children_count_ = index_table_.size();
 		}
 
 		//menu_node(menu_node& node) = delete;
 		//menu_node(menu_node&& node) : label_(node.label_), header_(std::move(node.header_)), raw_tuple_(std::move(node.raw_tuple_)), tgt_(node.tgt_), label_len_(node.label_len_), depth(node.depth), children_(std::move(node.children_)) {
 		//}
 
-		void init(buff_if_type *buff_if, data_if_type *data_if)
+		void init(buff_if_type* buff_if, data_if_type* data_if)
 		{
 			buff_if_ = buff_if;
 			data_if_ = data_if;
 
 			impl::init_node(buff_if_, data_if_, raw_tuple_, children_);
-			children_count_ = children_.size();
 		}
 
 		response_t on_entry()
@@ -649,8 +667,11 @@ namespace lib_menu {
 			// 最後に選択したメニューを記憶
 			confirm_index_ = index;
 			// 遷移先ノードを設定
-			size_t next_idx = index_table_[index];
-			data_if_->next_node = &children_[next_idx];
+			auto next_node_info = index_table_[index];
+			if (next_node_info.is_dyn) {
+				data_if_->dyn_index = next_node_info.container_index;
+			}
+			data_if_->next_node = &children_[next_node_info.tuple_index];
 			data_if_->next_dyn_data = nullptr;
 
 			return response_t::OK;
@@ -700,32 +721,41 @@ namespace lib_menu {
 		size_t children_count_;
 		size_t depth;
 		int tgt_;
-		std::vector<size_t> index_table_;
+		std::vector<impl::menu_item_info> index_table_;
 		size_t confirm_index_;
+		//
+		size_t cont_index_;
 
 		//menu_node_dyn(menu_node_dyn& node) = delete;
 		//menu_node_dyn(menu_node_dyn&& node) : label_(node.label_), cont_(node.cont_), raw_tuple_(std::move(node.raw_tuple_)), children_(std::move(node.children_)), depth(node.depth), tgt_(node.tgt_) {
 		//}
 
-		menu_node_dyn(T (&cont)[N], header_type &&header, Tuple &&tuple) : label_(nullptr), cont_(cont), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
+		menu_node_dyn(T(&cont)[N], header_type&& header, Tuple&& tuple) : label_(nullptr), cont_(cont), header_(std::forward<header_type>(header)), raw_tuple_(std::forward<Tuple>(tuple)), children_count_(0), tgt_(-1)
 		{
 			depth = impl::get_max_depth(raw_tuple_) + 1;
 			auto array = impl::gen_array(raw_tuple_);
 			index_table_.assign(std::begin(array), std::end(array));
+			children_count_ = index_table_.size();
 		}
 
-		void init(buff_if_type *buff_if, data_if_type *data_if)
+		void init(buff_if_type* buff_if, data_if_type* data_if)
 		{
 			buff_if_ = buff_if;
 			data_if_ = data_if;
 
 			impl::init_node(buff_if_, data_if_, raw_tuple_, children_);
-			children_count_ = children_.size();
 		}
 
 		response_t on_entry()
 		{
 			export_info();
+			// import_info
+			cont_index_ = data_if_->dyn_index;
+			// 選択データチェック
+			if (!cont_[cont_index_]) {
+				return response_t::NG;
+			}
+			//
 			return response_t::None;
 		}
 		void on_exit()
@@ -753,6 +783,17 @@ namespace lib_menu {
 				return response_t::NG;
 			}
 
+			// 受理処理を実施
+			// 最後に選択したメニューを記憶
+			confirm_index_ = index;
+			// 遷移先ノードを設定
+			auto next_node_info = index_table_[index];
+			if (next_node_info.is_dyn) {
+				data_if_->dyn_index = next_node_info.container_index;
+			}
+			data_if_->next_node = &children_[next_node_info.tuple_index];
+			data_if_->next_dyn_data = nullptr;
+
 			return response_t::OK;
 		}
 		void on_back()
@@ -767,6 +808,10 @@ namespace lib_menu {
 
 		void get_label()
 		{
+			for (size_t idx = 0; idx < ElemSize; idx++) {
+				cont_[idx].get_label(buff_if_->buffer[buff_if_->pos], buff_if_type::BufferColMax);
+				buff_if_->pos++;
+			}
 		}
 
 		void export_info()
@@ -803,22 +848,22 @@ namespace lib_menu {
 			label_len_ = std::strlen(label_);
 		}
 
-		void init(buff_if_type *buff_if, data_if_type *data_if)
+		void init(buff_if_type* buff_if, data_if_type* data_if)
 		{
 			buff_if_ = buff_if;
 			data_if_ = data_if;
 		}
 
-		char const *raw_label()
+		char const* raw_label()
 		{
 			return label_;
 		}
 
-		action_type &get_actor()
+		action_type& get_actor()
 		{
 			return actor_;
 		}
-		action_type &&move_actor()
+		action_type&& move_actor()
 		{
 			return std::move(actor_);
 		}
@@ -1015,30 +1060,50 @@ namespace lib_menu {
 
 struct data_node
 {
-	char const *label;
+	char const* label;
+	size_t len;
+
+	static constexpr char charno_data_label[] = "<no data>";
+	static constexpr size_t no_data_label_len = sizeof(charno_data_label);
+
+	data_node(): label(nullptr), len(0) {
+
+	}
+	data_node(char const* str) : label(str), len(strlen(str)) {
+
+	}
 
 	operator bool()
 	{
 		return label != nullptr;
 	}
+
+	void get_label(char *buffer, size_t buff_size) {
+		if (label != nullptr) {
+			std::memcpy(buffer, label, std::min(len + 1, buff_size));
+		}
+		else {
+			std::memcpy(buffer, charno_data_label, std::min(no_data_label_len, buff_size));
+		}
+	}
 };
 
 data_node data_c[] = {
 	data_node{"item1"},
-	data_node{"item2"},
+	data_node{},
 	data_node{"item3"},
 };
 
 struct header_root_menu
 {
-	void operator()(void *data)
+	void operator()(void* data)
 	{
 		std::cout << "<header_root_menu>" << std::endl;
 	}
 };
 struct header_menu_1
 {
-	void operator()(void *data)
+	void operator()(void* data)
 	{
 		std::cout << "<header_menu_1>" << std::endl;
 	}
@@ -1058,10 +1123,13 @@ struct actor_back
 
 struct my_buffer_interface
 {
+	static constexpr size_t BufferRowMax = lib_menu::BufferRowMax;
+	static constexpr size_t BufferColMax = lib_menu::BufferColMax;
+
 	char buffer[lib_menu::BufferRowMax][lib_menu::BufferColMax];
 	size_t pos;
 
-	my_buffer_interface() : buffer{0}, pos{0}
+	my_buffer_interface() : buffer{ 0 }, pos{ 0 }
 	{
 	}
 };
@@ -1081,7 +1149,8 @@ auto menu_mng = lm::make_menu(
 		lm::node(data_c,
 			lm::leaf("dyn_menu_1", actor_back{}),
 			lm::leaf("dyn_menu_2", actor_back{}),
-			lm::leaf("dyn_menu_3", actor_back{})
+			lm::leaf("dyn_menu_3", actor_back{}),
+			menu_back
 		),
 		lm::leaf("menu_1_2", actor_back{}),
 		menu_back
@@ -1148,6 +1217,21 @@ int main()
 	event_next();
 	event_next();
 	event_confirm();
+	event_confirm();
+	event_next();
+	event_next();
+	event_next();
+	event_next();
+	event_next();
+	event_next();
+	event_confirm();
+	event_next();
+	event_confirm();
+	event_next();
+	event_next();
+	event_next();
+	event_next();
+	event_next();
 
 	return 0;
 }
