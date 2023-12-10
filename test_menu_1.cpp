@@ -744,82 +744,8 @@ namespace lib_menu {
 		}
 	};
 
-	template <typename BuffIf, typename DataIf, typename Act>
+	template <bool IsDyn, typename T, typename BuffIf, typename DataIf, typename Act>
 	class menu_leaf
-	{
-	public:
-		using tag = impl::tag_menu_leaf;
-		using buff_if_type = BuffIf;
-		using data_if_type = DataIf;
-		using action_type = Act;
-		using children_type = impl::node_if::children_type;
-		static constexpr size_t depth = 1;
-		static constexpr size_t ElemSize = 1;
-
-	private:
-		char const* label_;
-		size_t label_len_;
-		buff_if_type* buff_if_;
-		data_if_type* data_if_;
-		action_type actor_;
-
-	public:
-		menu_leaf(char const* label, Act& actor) = delete;
-		menu_leaf(char const* label, Act&& actor) : label_(label), actor_(std::move(actor))
-		{
-			label_len_ = std::strlen(label_);
-		}
-
-		void init(buff_if_type* buff_if, data_if_type* data_if)
-		{
-			buff_if_ = buff_if;
-			data_if_ = data_if;
-		}
-
-		char const* raw_label()
-		{
-			return label_;
-		}
-
-		action_type& get_actor()
-		{
-			return actor_;
-		}
-		action_type&& move_actor()
-		{
-			return std::move(actor_);
-		}
-
-		response_t on_entry()
-		{
-			return actor_.on_entry();
-		}
-		void on_exit()
-		{
-		}
-		void on_event(event_t event)
-		{
-		}
-		response_t on_confirm(size_t index)
-		{
-			return actor_.on_confirm(index);
-		}
-		void on_back()
-		{
-		}
-		void on_render()
-		{
-		}
-
-		void get_label()
-		{
-			std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
-			buff_if_->pos++;
-		}
-	};
-
-	template <typename T, typename BuffIf, typename DataIf, typename Act>
-	class menu_leaf_dyn
 	{
 	public:
 		using tag = impl::tag_menu_leaf;
@@ -830,6 +756,7 @@ namespace lib_menu {
 		using children_type = impl::node_if::children_type;
 		static constexpr size_t depth = 1;
 		static constexpr size_t ElemSize = 1;
+		static constexpr bool IsDynamic = IsDyn;
 
 	private:
 		char const* label_;
@@ -839,11 +766,16 @@ namespace lib_menu {
 		action_type actor_;
 		data_type* data_;
 
-		using base_leaf_type = menu_leaf<buff_if_type, data_if_type, action_type>;
+		//using self_type = menu_leaf<IsDyn,T,BuffIf,DataIf,Act>;
+		using base_leaf_type = menu_leaf<false, void, buff_if_type, data_if_type, action_type>;
+
+		template<bool V, typename W, typename X, typename Y, typename Z>
+		friend class menu_leaf;
 
 	public:
-		menu_leaf_dyn(base_leaf_type& leaf) = delete;
-		menu_leaf_dyn(base_leaf_type&& leaf) : label_(leaf.raw_label()), actor_(leaf.move_actor()), data_(nullptr)
+
+		//menu_leaf(char const* label, Act& actor) = delete;
+		menu_leaf(char const* label, Act&& actor) : label_(label), actor_(std::move(actor))
 		{
 			label_len_ = std::strlen(label_);
 		}
@@ -855,8 +787,10 @@ namespace lib_menu {
 
 		response_t on_entry()
 		{
-			data_ = (data_type*)data_if_->next_dyn_data;
-			data_if_->children_ptr = nullptr;
+			if constexpr (IsDynamic) {
+				data_ = (data_type*)data_if_->next_dyn_data;
+				data_if_->children_ptr = nullptr;
+			}
 			return actor_.on_entry();;
 		}
 		void on_exit()
@@ -881,28 +815,43 @@ namespace lib_menu {
 			std::memcpy(buff_if_->buffer[buff_if_->pos], label_, label_len_ + 1);
 			buff_if_->pos++;
 		}
+
+
+
+		char const* raw_label()
+		{
+			return label_;
+		}
+
+		action_type& get_actor()
+		{
+			return actor_;
+		}
+		action_type&& move_actor()
+		{
+			return std::move(actor_);
+		}
 	};
 
 	namespace impl
 	{
-		template <typename BuffIf, typename DataIf, typename T, typename Tuple, std::size_t I>
-		auto make_menu_leaf_dyn(Tuple&& tuple)
+		template <typename BuffIf, typename DataIf, typename T, typename Elem, std::size_t I>
+		auto make_menu_leaf_dyn(Elem&& leaf)
 		{
-			using Elem = typename std::tuple_element<I, Tuple>::type;
+			// メニュー構築用の一時クラスを作成して、経由するようにする
 			using Act = typename Elem::action_type;
-			if constexpr (std::is_same_v<Elem, menu_leaf<BuffIf, DataIf, Act>>) {
-				return menu_leaf_dyn<T, BuffIf, DataIf, Act>(std::forward<Elem>(std::get<I>(tuple)));
-			}
-			else {
-				// error
-			}
+			return menu_leaf<true, T, BuffIf, DataIf, Act>(leaf.raw_label(), leaf.move_actor());
 		}
 
 		template <typename BuffIf, typename DataIf, class T, class... Args, std::size_t... I>
 		auto make_menu_leaf_dyn(T const& c, std::tuple<Args...>&& tuple, std::index_sequence<I...>)
 		{
+			using Tuple = std::tuple<Args...>;
 			return std::make_tuple(
-				make_menu_leaf_dyn<BuffIf, DataIf, T, std::tuple<Args...>, I>(std::forward<std::tuple<Args...>>(tuple))...
+				make_menu_leaf_dyn<
+					BuffIf, DataIf, T, typename std::tuple_element<I, Tuple>::type, I
+				>
+				(std::forward<typename std::tuple_element<I, Tuple>::type>(std::get<I>(tuple)))...
 			);
 		}
 		template <typename BuffIf, typename DataIf, class T, class... Args>
@@ -969,9 +918,9 @@ namespace lib_menu {
 		}
 
 		template <typename Actor>
-		static menu_leaf<buff_if_type, data_if_type, Actor> leaf(char const* label, Actor&& actor)
+		static auto leaf(char const* label, Actor&& actor)
 		{
-			return menu_leaf<buff_if_type, data_if_type, Actor>{label, std::forward<Actor>(actor)};
+			return menu_leaf<false, void, buff_if_type, data_if_type, Actor>{label, std::forward<Actor>(actor)};
 		}
 
 		template <typename Actor>
