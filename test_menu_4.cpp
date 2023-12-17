@@ -8,6 +8,7 @@
 #include <cstring>
 #include <array>
 #include <memory>
+#include <map>
 
 namespace lib_menu
 {
@@ -22,38 +23,44 @@ namespace lib_menu
 		char buffer[BufferRowMax][BufferColMax];
 		size_t pos;
 
-		buffer_interface() : buffer{ 0 }, pos{ 0 }
+		buffer_interface() : buffer{0}, pos{0}
 		{
 		}
 	};
 }
 
-namespace lib_menu {
+namespace lib_menu
+{
 
-	enum class event_t {
+	enum class event_t
+	{
 		None,
-		SelectNext,		// 次の項目を選択
-		SelectPrev,		// 前の項目を選択
-		Confirm,		// 選択している項目で決定する
-		Back,			// 上位メニューに戻る
+		SelectNext, // 次の項目を選択
+		SelectPrev, // 前の項目を選択
+		Confirm,	// 選択している項目で決定する
+		Back,		// 上位メニューに戻る
 
 		MAX,
 	};
 
-	enum class response_t {
+	enum class response_t
+	{
 		None,
-		OK,				// 操作受理
-		NG,				// 操作拒否
-		ReqBack,		// 上位メニューに戻る
+		OK,		   // 操作受理
+		NG,		   // 操作拒否
+		ReqBack,   // 上位メニューに戻る
+		ExitPopup, // ポップアップメニュー終了
 
 		MAX
 	};
 
-	namespace impl {
+	namespace impl
+	{
 		// menu_node_dynにより表示メニュー項目数とmenu_node_*タプル要素数がずれる
 		// その差を吸収するための情報構造体
-		struct menu_item_info {
-			size_t tuple_index;	// メニュー項目の位置と対応するtupleのノード位置をひもづける
+		struct menu_item_info
+		{
+			size_t tuple_index; // メニュー項目の位置と対応するtupleのノード位置をひもづける
 			size_t container_index;
 			bool is_dyn;
 		};
@@ -61,7 +68,7 @@ namespace lib_menu {
 		template <std::size_t N, size_t I, std::size_t... Indices>
 		constexpr auto gen_array(std::index_sequence<Indices...>)
 		{
-			return std::array<menu_item_info, N>{ menu_item_info{ I, Indices, N > 1 }... };
+			return std::array<menu_item_info, N>{menu_item_info{I, Indices, N > 1}...};
 		}
 
 		template <std::size_t N, size_t I>
@@ -72,49 +79,49 @@ namespace lib_menu {
 
 		// Helper function to concatenate two arrays
 		template <std::size_t... Indices1, std::size_t... Indices2, typename T, std::size_t N1, std::size_t N2>
-		constexpr auto concatenateArraysImpl3(const std::array<T, N1>& arr1, const std::array<T, N2>& arr2, std::index_sequence<Indices1...>, std::index_sequence<Indices2...>)
+		constexpr auto concatenateArraysImpl3(const std::array<T, N1> &arr1, const std::array<T, N2> &arr2, std::index_sequence<Indices1...>, std::index_sequence<Indices2...>)
 		{
 			return std::array<T, N1 + N2>{arr1[Indices1]..., arr2[Indices2]...};
 		}
 
 		// Recursive function to concatenate multiple arrays
 		template <typename T, size_t TN, typename U, size_t UN>
-		constexpr auto concatenateArraysImpl2(const std::array<T, TN>& arr1, const std::array<U, UN>& arr2)
+		constexpr auto concatenateArraysImpl2(const std::array<T, TN> &arr1, const std::array<U, UN> &arr2)
 		{
 			return concatenateArraysImpl3(arr1, arr2, std::make_index_sequence<TN>(), std::make_index_sequence<UN>());
 		}
 
 		// Recursive function to concatenate multiple arrays
 		template <typename T>
-		constexpr auto concatenateArraysImpl1(const T& arr1)
+		constexpr auto concatenateArraysImpl1(const T &arr1)
 		{
 			return arr1;
 		}
 
 		// Recursive function to concatenate multiple arrays
 		template <typename T, typename U>
-		constexpr auto concatenateArraysImpl1(const T& arr1, const U& arr2)
+		constexpr auto concatenateArraysImpl1(const T &arr1, const U &arr2)
 		{
 			return concatenateArraysImpl2(arr1, arr2);
 		}
 
 		// Recursive function to concatenate multiple arrays
 		template <typename T, typename U, typename... Arrays>
-		constexpr auto concatenateArraysImpl1(const T& arr1, const U& arr2, const Arrays &...arrays)
+		constexpr auto concatenateArraysImpl1(const T &arr1, const U &arr2, const Arrays &...arrays)
 		{
 			return concatenateArraysImpl1(concatenateArraysImpl2(arr1, arr2), concat_arrays(arrays...));
 		}
 
 		// Recursive function to concatenate multiple arrays
 		template <typename T>
-		constexpr auto concat_arrays(const T& arr)
+		constexpr auto concat_arrays(const T &arr)
 		{
 			return arr;
 		}
 
 		// Recursive function to concatenate multiple arrays
 		template <typename T, typename... Arrays>
-		constexpr auto concat_arrays(const T& arr, const Arrays &...arrays)
+		constexpr auto concat_arrays(const T &arr, const Arrays &...arrays)
 		{
 			return concatenateArraysImpl1(arr, concat_arrays(arrays...));
 		}
@@ -142,26 +149,24 @@ namespace lib_menu {
 		using children_type = std::vector<std::unique_ptr<menu_node_base>>;
 
 		children_type children_;
-		buff_if_type* buff_if_;
-		data_if_type* data_if_;
+		buff_if_type *buff_if_;
+		data_if_type *data_if_;
 
 		menu_node_base()
 			: children_(), buff_if_(nullptr), data_if_(nullptr)
 		{
-
 		}
-		menu_node_base(children_type&& children)
+		menu_node_base(children_type &&children)
 			: children_(std::move(children)), buff_if_(nullptr), data_if_(nullptr)
 		{
-
 		}
 
-		void init(buff_if_type* buff_if, data_if_type* data_if)
+		void init(buff_if_type *buff_if, data_if_type *data_if)
 		{
 			buff_if_ = buff_if;
 			data_if_ = data_if;
 
-			for (auto& elem : children_)
+			for (auto &elem : children_)
 			{
 				elem->init(buff_if, data_if);
 			}
@@ -183,61 +188,65 @@ namespace lib_menu {
 
 	private:
 		std::unique_ptr<actor_type> actor;
-		actor_type* actor_ref;
-
+		actor_type *actor_ref;
 
 	public:
-		menu_header(std::unique_ptr<actor_type>&& actor_, actor_type* actor_ref_) : actor(std::move(actor_)), actor_ref(actor_ref_)
+		menu_header(std::unique_ptr<actor_type> &&actor_, actor_type *actor_ref_) : actor(std::move(actor_)), actor_ref(actor_ref_)
 		{
 		}
 
-		void on_render(void* data)
+		void on_render(void *data)
 		{
 			(*actor_ref)(data);
 		}
 	};
 
-
-	template <typename BuffIf, typename DataIf, size_t Depth>
+	template <typename BuffIf, typename DataIf, typename PopupList, size_t Depth>
 	class menu_mng
 	{
-		using self_type = menu_mng<BuffIf, DataIf, Depth>;
+		using self_type = menu_mng<BuffIf, DataIf, PopupList, Depth>;
 
 		using buff_if_type = BuffIf;
 		using data_if_type = DataIf;
 		using menu_node_type = menu_node_base<BuffIf, DataIf>;
 		using child_type = std::unique_ptr<menu_node_type>;
 		using children_type = std::vector<std::unique_ptr<menu_node_type>>;
+		using popup_menu_list_type = PopupList;
+		using popup_menu_key_type = typename PopupList::key_type;
 
-		using confirm_stack_type = std::vector<menu_node_type*>;
+		using confirm_stack_type = std::vector<menu_node_type *>;
 
 		// 所有データ管理
 		child_type child_;
 		// children_type children_;
 		//
 		std::unique_ptr<buff_if_type> buff_;
-		buff_if_type* buff_ptr_;
+		buff_if_type *buff_ptr_;
 		data_if_type data_;
 
 		// メニュー表示管理
 		size_t children_count_;
-		menu_node_type* confirm_ptr_;
+		menu_node_type *confirm_ptr_;
 		confirm_stack_type confirm_stack_;
 		size_t select_idx_;
+		// ポップアップメニュー
+		popup_menu_list_type popup_list_;
+		size_t popup_bk_buff_ptr_pos_;
 
 	public:
 		static constexpr size_t depth = Depth;
 
 	public:
-		menu_mng(child_type&& child) : child_(std::move(child)), buff_(), buff_ptr_(nullptr), children_count_(0), confirm_ptr_(), confirm_stack_(), select_idx_(0)
+		menu_mng(child_type &&child) : child_(std::move(child)), buff_(), buff_ptr_(nullptr), children_count_(0), confirm_ptr_(), confirm_stack_(), select_idx_(0), popup_list_(), popup_bk_buff_ptr_pos_(0)
 		{
-			confirm_stack_.reserve(depth);
+			// popupメニュー分+1
+			confirm_stack_.reserve(depth + 1);
 		}
-		menu_mng(buff_if_type& buff, child_type&& child) : menu_mng(std::forward<child_type>(child))
+		menu_mng(buff_if_type &buff, child_type &&child) : menu_mng(std::forward<child_type>(child))
 		{
 			buff_ptr_ = &buff;
 		}
-		menu_mng(std::unique_ptr<buff_if_type>&& buff, child_type&& child) : menu_mng(std::forward<child_type>(child))
+		menu_mng(std::unique_ptr<buff_if_type> &&buff, child_type &&child) : menu_mng(std::forward<child_type>(child))
 		{
 			buff_ = std::move(buff);
 			buff_ptr_ = buff_.get();
@@ -247,6 +256,14 @@ namespace lib_menu {
 		void init()
 		{
 			child_->init(buff_ptr_, &data_);
+		}
+
+		template <typename T>
+		self_type &&add(std::pair<popup_menu_key_type, T> &&value) &&
+		{
+			popup_list_.insert(std::move(value));
+
+			return std::move(*this);
 		}
 
 		/// @brief このインスタンスによるメニュー表示処理開始時にコールする。
@@ -324,6 +341,10 @@ namespace lib_menu {
 				on_req_back();
 				break;
 
+			case response_t::ExitPopup:
+				on_exit_popup();
+				break;
+
 			default:
 				// その他:何もしない
 				break;
@@ -361,8 +382,35 @@ namespace lib_menu {
 			on_render();
 		}
 
-		self_type&& add()&& {
-			return std::move(*this);
+		void on_exit_popup()
+		{
+			// 現ノードから抜ける
+			confirm_ptr_->on_exit();
+			// 前ノードを選択
+			confirm_stack_.pop_back();
+			confirm_ptr_ = confirm_stack_.back();
+			buff_ptr_->pos = popup_bk_buff_ptr_pos_;
+			// メニュー表示処理
+			on_render();
+		}
+
+		void on_popup(popup_menu_key_type &key)
+		{
+			// key存在チェック
+			if (popup_list_.count(key) == 0)
+			{
+				return;
+			}
+			// popupメニュー取得
+			auto &popup = popup_list_[key];
+			// auto &popup = item.second;
+			//
+			popup_bk_buff_ptr_pos_ = buff_ptr_->pos;
+			buff_ptr_->pos = 0;
+			// popupメニュー表示に遷移
+			data_.next_node = popup.get();
+			data_.select_index = select_idx_;
+			check_entry();
 		}
 
 	private:
@@ -415,7 +463,6 @@ namespace lib_menu {
 			select_idx_ = data_.select_index;
 			children_count_ = data_.menu_count;
 		}
-
 	};
 
 	template <bool IsDyn, typename T, size_t N, size_t Depth, typename BuffIf, typename DataIf, typename Header, typename RawType>
@@ -441,10 +488,11 @@ namespace lib_menu {
 		using raw_type = RawType;
 
 		// 固定ラベル表示ノードデータ
-		char const* label_;
+		char const *label_;
 		size_t label_len_;
 		// 配列表示ノードデータ
-		T(*cont_)[N];
+		T(*cont_)
+		[N];
 
 		// 共通データ
 		header_type header_;
@@ -456,7 +504,7 @@ namespace lib_menu {
 		//
 		size_t cont_index_;
 
-		menu_node(char const* label, header_type&& header, children_type&& children)
+		menu_node(char const *label, header_type &&header, children_type &&children)
 			: label_(label), label_len_(0), cont_(nullptr), header_(std::forward<header_type>(header)), children_count_(0), confirm_index_(0), tgt_(-1), base_type(std::move(children))
 		{
 			static_assert(!IsDynamic, "dynノードでないときは固定ラベルを指定する");
@@ -465,7 +513,7 @@ namespace lib_menu {
 			init_impl();
 		}
 
-		menu_node(T(&cont)[N], header_type&& header, children_type&& children)
+		menu_node(T (&cont)[N], header_type &&header, children_type &&children)
 			: label_(nullptr), label_len_(0), cont_(&cont), header_(std::forward<header_type>(header)), children_count_(0), confirm_index_(0), tgt_(-1), base_type(std::move(children))
 		{
 			static_assert(IsDynamic, "dynノードのときはラベルコンテナを指定する");
@@ -473,10 +521,11 @@ namespace lib_menu {
 			init_impl();
 		}
 
-		void init_impl() {
+		void init_impl()
+		{
 			// dynメニューではchildの数と表示メニュー項目の数が一致しない
 			// 選択メニュー番号からchildのインデックスへ変換するテーブルを生成しておく
-			auto& array = raw_type::node2index_table;
+			auto &array = raw_type::node2index_table;
 			index_table_.assign(std::begin(array), std::end(array));
 			children_count_ = index_table_.size();
 		}
@@ -486,11 +535,13 @@ namespace lib_menu {
 			// 自分の情報を通知
 			export_info();
 
-			if constexpr (IsDynamic) {
+			if constexpr (IsDynamic)
+			{
 				// 上位からの情報を取り込む
 				cont_index_ = this->data_if_->dyn_index;
 				// 選択データチェック
-				if (!(*cont_)[cont_index_]) {
+				if (!(*cont_)[cont_index_])
+				{
 					return response_t::NG;
 				}
 			}
@@ -522,7 +573,7 @@ namespace lib_menu {
 			if (next_node_info.is_dyn)
 			{
 				this->data_if_->dyn_index = next_node_info.container_index;
-				this->data_if_->next_dyn_data = (void*)&((*cont_)[this->data_if_->dyn_index]);
+				this->data_if_->next_dyn_data = (void *)&((*cont_)[this->data_if_->dyn_index]);
 			}
 			else
 			{
@@ -542,13 +593,12 @@ namespace lib_menu {
 			header_.on_render(nullptr);
 		}
 
-
 		void make_disp()
 		{
 			// 初期化
 			this->buff_if_->pos = 0;
 			// メニュー表示情報作成
-			for (auto& node : this->children_)
+			for (auto &node : this->children_)
 			{
 				node->get_label();
 			}
@@ -556,14 +606,16 @@ namespace lib_menu {
 
 		void get_label()
 		{
-			if constexpr (IsDynamic) {
+			if constexpr (IsDynamic)
+			{
 				for (size_t idx = 0; idx < label_count; idx++)
 				{
 					(*cont_)[idx].get_label(this->buff_if_->buffer[this->buff_if_->pos], buff_if_type::BufferColMax);
 					this->buff_if_->pos++;
 				}
 			}
-			else {
+			else
+			{
 				std::memcpy(this->buff_if_->buffer[this->buff_if_->pos], label_, label_len_ + 1);
 				this->buff_if_->pos++;
 			}
@@ -574,7 +626,6 @@ namespace lib_menu {
 			this->data_if_->menu_count = children_count_;
 			this->data_if_->select_index = confirm_index_;
 		}
-
 	};
 
 	template <bool IsDyn, typename DynData, typename BuffIf, typename DataIf, typename Act>
@@ -593,19 +644,19 @@ namespace lib_menu {
 		static constexpr bool IsDynamic = IsDyn;
 
 	private:
-		char const* label_;
+		char const *label_;
 		size_t label_len_;
 		// actorの所有権を持つ場合はunique_ptrで保持する
 		// 参照を受け取った場合は参照用ポインタのみ保持する
 		std::unique_ptr<actor_type> actor;
-		actor_type* actor_ref;
+		actor_type *actor_ref;
 		// dynメニュー用定義
 		// 上位階層でコンテナからデータを選択する場合、
 		// 選択したデータへの参照を保持する
-		data_type* data_;
+		data_type *data_;
 
 	public:
-		menu_leaf(char const* label, std::unique_ptr<actor_type>&& actor_, actor_type* actor_ref_)
+		menu_leaf(char const *label, std::unique_ptr<actor_type> &&actor_, actor_type *actor_ref_)
 			: label_(label), actor(std::move(actor_)), actor_ref(actor_ref_), base_type()
 		{
 			label_len_ = std::strlen(label_);
@@ -613,8 +664,9 @@ namespace lib_menu {
 
 		response_t on_entry()
 		{
-			if constexpr (IsDynamic) {
-				data_ = (data_type*)this->data_if_->next_dyn_data;
+			if constexpr (IsDynamic)
+			{
+				data_ = (data_type *)this->data_if_->next_dyn_data;
 			}
 			return actor_ref->on_entry();
 		}
@@ -641,24 +693,100 @@ namespace lib_menu {
 			this->buff_if_->pos++;
 		}
 
-
-
-		char const* raw_label()
+		char const *raw_label()
 		{
 			return label_;
 		}
 
-		actor_type& get_actor()
+		actor_type &get_actor()
 		{
 			return actor;
 		}
-		actor_type&& move_actor()
+		actor_type &&move_actor()
 		{
 			return std::move(actor);
 		}
 	};
 
-	template <typename Buff = buffer_interface>
+	template <typename Key, typename BuffIf, typename DataIf, typename Act>
+	class menu_popup : menu_node_base<BuffIf, DataIf>
+	{
+	public:
+		using key_type = Key;
+
+		using label_type = char;
+		static constexpr size_t label_count = 0;
+
+		using base_type = menu_node_base<BuffIf, DataIf>;
+		using buff_if_type = BuffIf;
+		using data_if_type = DataIf;
+		using actor_type = Act;
+		using data_type = void;
+		static constexpr size_t depth = 1;
+		static constexpr bool IsDynamic = false;
+
+	private:
+		// actorの所有権を持つ場合はunique_ptrで保持する
+		// 参照を受け取った場合は参照用ポインタのみ保持する
+		std::unique_ptr<actor_type> actor;
+		actor_type *actor_ref;
+
+	public:
+		menu_popup(std::unique_ptr<actor_type> &&actor_, actor_type *actor_ref_)
+			: actor(std::move(actor_)), actor_ref(actor_ref_), base_type()
+		{
+		}
+		menu_popup(actor_type &actor_)
+			: actor(), actor_ref(&actor_)
+		{
+		}
+		menu_popup(actor_type &&actor_)
+			: actor(std::make_unique<actor_type>(std::move(actor_))), actor_ref(actor.get())
+		{
+		}
+
+		response_t on_entry()
+		{
+			return actor_ref->on_entry();
+		}
+		void on_exit()
+		{
+		}
+		void on_event(event_t event)
+		{
+		}
+		response_t on_confirm(size_t index)
+		{
+			return actor_ref->on_confirm(index);
+		}
+		void on_back()
+		{
+		}
+		void on_render()
+		{
+			actor_ref->on_render();
+		}
+
+		void get_label()
+		{
+		}
+
+		char const *raw_label()
+		{
+			return "";
+		}
+
+		actor_type &get_actor()
+		{
+			return actor;
+		}
+		actor_type &&move_actor()
+		{
+			return std::move(actor);
+		}
+	};
+
+	template <typename Buff = buffer_interface, typename PopupKey = size_t>
 	class builder
 	{
 		struct data_interface;
@@ -667,18 +795,21 @@ namespace lib_menu {
 		using data_if_type = data_interface;
 		using buff_inst_type = std::unique_ptr<buff_if_type>;
 		using base_type = menu_node_base<buff_if_type, data_if_type>;
-		//
+		// menu要素定義
 		using child_type = typename base_type::child_type;
 		using children_type = typename base_type::children_type;
+		// popup menu要素定義
+		using popup_menu_key_type = PopupKey;
+		using popup_menu_list_type = std::map<popup_menu_key_type, child_type>;
 
 		struct data_interface
 		{
 			// childからparentに渡すデータ
-			base_type* next_node;
+			base_type *next_node;
 			size_t menu_count;
 			size_t select_index;
 			// parentからchildに渡すデータ
-			void* next_dyn_data;
+			void *next_dyn_data;
 			size_t dyn_index;
 
 			data_interface() : next_node(nullptr), menu_count(0), select_index(0), next_dyn_data(nullptr), dyn_index(0)
@@ -687,7 +818,8 @@ namespace lib_menu {
 		};
 
 		template <bool IsDyn, typename T, size_t N, size_t Depth, typename HeaderActor, typename RawChildren>
-		struct temp_menu_node {
+		struct temp_menu_node
+		{
 			// ラベルをいくつ持つかの定義:
 			//   labelを持つデータ型のN個の配列
 			//   or ラベル文字列を1個
@@ -701,61 +833,73 @@ namespace lib_menu {
 
 			temp_menu_node() {}
 
-			//label_type(&label_ref)[label_len];
-			//header_type&& header;
-			//children_type&& children;
-			//temp_menu_node(T(&label_)[N], header_type&& header_, children_type&& children_)
+			// label_type(&label_ref)[label_len];
+			// header_type&& header;
+			// children_type&& children;
+			// temp_menu_node(T(&label_)[N], header_type&& header_, children_type&& children_)
 			//	: label_ref(label_), header(std::forward<header_type>(header_)), children(std::forward<children_type>(children_))
 			//{}
-			//temp_menu_node(temp_menu_node&) = delete;
-			//temp_menu_node(temp_menu_node&& node)
+			// temp_menu_node(temp_menu_node&) = delete;
+			// temp_menu_node(temp_menu_node&& node)
 			//	: temp_menu_node(node.label_ref, std::move(node.header), std::move(node.children))
 			//{}
 		};
-		template<typename Actor>
-		struct temp_menu_leaf {
+		template <typename Actor>
+		struct temp_menu_leaf
+		{
 			using label_type = char;
 			static constexpr size_t label_count = 1;
 
 			using actor_type = Actor;
 			static constexpr size_t depth = 1;
 
-			char const* label_ref;
+			char const *label_ref;
 			std::unique_ptr<actor_type> actor;
-			actor_type* actor_ref;
+			actor_type *actor_ref;
 
-			temp_menu_leaf(char const* label_, Actor& actor_)
+			temp_menu_leaf(char const *label_, Actor &actor_)
 				: label_ref(label_), actor(), actor_ref(&actor_)
-			{}
-			temp_menu_leaf(char const* label_, Actor&& actor_)
-				: label_ref(label_), actor(std::make_unique<actor_type>(std::forward<Actor>(actor_))), actor_ref(actor.get())
-			{}
+			{
+			}
+			temp_menu_leaf(char const *label_, Actor &&actor_)
+				: label_ref(label_), actor(std::make_unique<actor_type>(std::move(actor_))), actor_ref(actor.get())
+			{
+			}
 		};
-		template<typename Actor>
-		struct temp_menu_header {
+		template <typename Actor>
+		struct temp_menu_header
+		{
 			using actor_type = Actor;
 
 			std::unique_ptr<actor_type> actor;
-			actor_type* actor_ref;
+			actor_type *actor_ref;
 
 			temp_menu_header() : actor(), actor_ref(nullptr) {}
-			temp_menu_header(Actor& actor_)
+			temp_menu_header(Actor &actor_)
 				: actor(), actor_ref(&actor_)
-			{}
-			temp_menu_header(Actor&& actor_)
-				: actor(std::make_unique<actor_type>(std::forward<Actor>(actor_))), actor_ref(actor.get())
-			{}
+			{
+			}
+			temp_menu_header(Actor &&actor_)
+				: actor(std::make_unique<actor_type>(std::move(actor_))), actor_ref(actor.get())
+			{
+			}
 		};
 		struct temp_menu_header_dummy
 		{
-			void operator()(void* data)
-			{}
+			void operator()(void *data)
+			{
+			}
 		};
 
-		struct tag_temp_menu_node {};
-		struct tag_temp_menu_leaf {};
-		template<typename Tag, typename Node>
-		struct temp_menu_holder {
+		struct tag_temp_menu_node
+		{
+		};
+		struct tag_temp_menu_leaf
+		{
+		};
+		template <typename Tag, typename Node>
+		struct temp_menu_holder
+		{
 			using tag = Tag;
 			using node_type = Node;
 			node_type node;
@@ -775,83 +919,90 @@ namespace lib_menu {
 			*/
 		};
 
-
-		template<typename T>
-		struct elem_info {
+		template <typename T>
+		struct elem_info
+		{
 			static constexpr size_t depth = std::remove_reference_t<T>::depth;
 		};
 
-		template<typename... Args>
-		struct temp_menu_raw_type {
-			using tuple_type = std::tuple< typename std::remove_reference<Args>::type::node_type... >;
-			static constexpr size_t depth = std::max({ elem_info<typename std::remove_reference<Args>::type::node_type>::depth... });
+		template <typename... Args>
+		struct temp_menu_raw_type
+		{
+			using tuple_type = std::tuple<typename std::remove_reference<Args>::type::node_type...>;
+			static constexpr size_t depth = std::max({elem_info<typename std::remove_reference<Args>::type::node_type>::depth...});
 			static constexpr auto node2index_table = impl::gen_node2index_table_array<tuple_type>();
 		};
 
-		template<typename Actor>
-		static auto make_child_nml_impl(temp_menu_leaf<Actor>& leaf) {
+		template <typename Actor>
+		static auto make_child_nml_impl(temp_menu_leaf<Actor> &leaf)
+		{
 			return child_type{
-				(base_type*)new menu_leaf<false, void, buff_if_type, data_if_type, Actor>{
-					leaf.label_ref, std::move(leaf.actor), leaf.actor_ref
-				}
-			};
+				(base_type *)new menu_leaf<false, void, buff_if_type, data_if_type, Actor>{
+					leaf.label_ref, std::move(leaf.actor), leaf.actor_ref}};
 		}
 
-		template<typename Node>
-		static auto make_child_nml(Node&& node)
+		template <typename Node>
+		static auto make_child_nml(Node &&node)
 		{
-			if constexpr (std::is_same_v<typename std::remove_reference<Node>::type::tag, tag_temp_menu_leaf>) {
+			if constexpr (std::is_same_v<typename std::remove_reference<Node>::type::tag, tag_temp_menu_leaf>)
+			{
 				return make_child_nml_impl(std::forward<Node>(node).node);
 			}
-			else {
+			else
+			{
 				return std::move(node.child);
 			}
 		}
 
-		template<typename T, typename Actor>
-		static auto make_child_dyn_impl(temp_menu_leaf<Actor>& leaf) {
+		template <typename T, typename Actor>
+		static auto make_child_dyn_impl(temp_menu_leaf<Actor> &leaf)
+		{
 			return child_type{
-				(base_type*)new menu_leaf<true, T, buff_if_type, data_if_type, Actor>{
-					leaf.label_ref, std::move(leaf.actor), leaf.actor_ref
-				}
-			};
+				(base_type *)new menu_leaf<true, T, buff_if_type, data_if_type, Actor>{
+					leaf.label_ref, std::move(leaf.actor), leaf.actor_ref}};
 		}
 
-		template<typename T, typename Node>
-		static auto make_child_dyn(Node&& node)
+		template <typename T, typename Node>
+		static auto make_child_dyn(Node &&node)
 		{
-			if constexpr (std::is_same_v<typename std::remove_reference<Node>::type::tag, tag_temp_menu_leaf>) {
+			if constexpr (std::is_same_v<typename std::remove_reference<Node>::type::tag, tag_temp_menu_leaf>)
+			{
 				return make_child_dyn_impl<T>(std::forward<Node>(node).node);
 			}
-			else {
+			else
+			{
 				// error
 			}
 		}
 
-		template<typename Vec, typename T>
-		static void make_children_nml_vec(Vec& vec, T&& node) {
+		template <typename Vec, typename T>
+		static void make_children_nml_vec(Vec &vec, T &&node)
+		{
 			vec.push_back(make_child_nml(std::forward<T>(node)));
 		}
-		template<typename Vec, typename T, typename...Args>
-		static void make_children_nml_vec(Vec& vec, T&& node, Args&&... nodes) {
+		template <typename Vec, typename T, typename... Args>
+		static void make_children_nml_vec(Vec &vec, T &&node, Args &&...nodes)
+		{
 			vec.push_back(make_child_nml(std::forward<T>(node)));
 			make_children_nml_vec(vec, std::forward<Args>(nodes)...);
 		}
 
 		template <typename... Args>
-		static auto make_children_nml(Args&&... nodes)
+		static auto make_children_nml(Args &&...nodes)
 		{
 			children_type children;
 			make_children_nml_vec(children, std::forward<Args>(nodes)...);
 			return std::move(children);
 		}
 
-		template<typename Data, typename Vec, typename T>
-		static void make_children_dyn_vec(Vec& vec, T&& node) {
+		template <typename Data, typename Vec, typename T>
+		static void make_children_dyn_vec(Vec &vec, T &&node)
+		{
 			vec.push_back(make_child_dyn<Data>(std::forward<T>(node)));
 		}
-		template<typename Data, typename Vec, typename T, typename...Args>
-		static void make_children_dyn_vec(Vec& vec, T&& node, Args&&... nodes) {
+		template <typename Data, typename Vec, typename T, typename... Args>
+		static void make_children_dyn_vec(Vec &vec, T &&node, Args &&...nodes)
+		{
 			vec.push_back(make_child_dyn<Data>(std::forward<T>(node)));
 			make_children_nml_vec(vec, std::forward<Args>(nodes)...);
 		}
@@ -865,7 +1016,7 @@ namespace lib_menu {
 		}
 
 		template <typename T, size_t N, typename Header, typename... Args>
-		static auto make_node_nml_impl(T(&c)[N], temp_menu_header<Header>&& header, Args &&...nodes)
+		static auto make_node_nml_impl(T (&c)[N], temp_menu_header<Header> &&header, Args &&...nodes)
 		{
 			auto children = make_children_nml(nodes...);
 			auto new_header = menu_header<Header>(std::move(header.actor), header.actor_ref);
@@ -876,11 +1027,11 @@ namespace lib_menu {
 
 			return temp_menu_holder<tag_temp_menu_node, raw_node_type>{
 				raw_node_type{},
-					child_type{ (base_type*)new node_type{c, std::move(new_header), std::move(children)} }};
+				child_type{(base_type *)new node_type{c, std::move(new_header), std::move(children)}}};
 		}
 
 		template <typename T, size_t N, typename Header, typename... Args>
-		static auto make_node_dyn_impl(T(&c)[N], temp_menu_header<Header>&& header, Args &&...nodes)
+		static auto make_node_dyn_impl(T (&c)[N], temp_menu_header<Header> &&header, Args &&...nodes)
 		{
 			auto children = make_children_dyn<T>(nodes...);
 			auto new_header = menu_header<Header>(std::move(header.actor), header.actor_ref);
@@ -892,42 +1043,43 @@ namespace lib_menu {
 
 			return temp_menu_holder<tag_temp_menu_node, raw_node_type>{
 				raw_node_type{},
-					child_type{ (base_type*)new node_type{c, std::move(new_header), std::move(children)} }};
+				child_type{(base_type *)new node_type{c, std::move(new_header), std::move(children)}}};
 		}
 
 		template <typename T, size_t N, typename Header, typename... Args>
-		static auto make_node_impl(T(&c)[N], temp_menu_header<Header>&& header, Args &&...nodes)
+		static auto make_node_impl(T (&c)[N], temp_menu_header<Header> &&header, Args &&...nodes)
 		{
-			if constexpr (std::is_integral_v<T>) {
+			if constexpr (std::is_integral_v<T>)
+			{
 				// 固定文字列で表示するメニュー
 				return make_node_nml_impl(c, std::forward<temp_menu_header<Header>>(header), std::forward<Args>(nodes)...);
 			}
-			else {
+			else
+			{
 				// コンテナ(T(&c)[N])で動的に表示するメニュー
 				return make_node_dyn_impl(c, std::forward<temp_menu_header<Header>>(header), std::forward<Args>(nodes)...);
 			}
 		}
 
 	public:
-
 		template <typename Header, typename... Args>
-		static auto make_menu(buff_if_type& buffer, Header&& header, Args &&...nodes)
+		static auto make_menu(buff_if_type &buffer, Header &&header, Args &&...nodes)
 		{
 			auto root = make_node_impl("root", std::forward<Header>(header), std::forward<Args>(nodes)...);
 			using root_type = decltype(root);
 			using raw_node_type = typename root_type::node_type;
 
-			return menu_mng<buff_if_type, data_if_type, raw_node_type::depth>(buffer, std::move(root.child));
+			return menu_mng<buff_if_type, data_if_type, popup_menu_list_type, raw_node_type::depth>(buffer, std::move(root.child));
 		}
 
 		template <typename Header, typename... Args>
-		static auto make_menu(Header&& header, Args &&...nodes)
+		static auto make_menu(Header &&header, Args &&...nodes)
 		{
 			auto root = make_node_impl("root", std::forward<Header>(header), std::forward<Args>(nodes)...);
 			using root_type = decltype(root);
 			using raw_node_type = typename root_type::node_type;
 
-			return menu_mng<buff_if_type, data_if_type, raw_node_type::depth>(std::make_unique<buff_if_type>(), std::move(root.child));
+			return menu_mng<buff_if_type, data_if_type, popup_menu_list_type, raw_node_type::depth>(std::make_unique<buff_if_type>(), std::move(root.child));
 		}
 
 		template <typename... Args>
@@ -937,192 +1089,236 @@ namespace lib_menu {
 		}
 
 		template <typename T, size_t N, typename Header, typename... Args>
-		static auto node(T(&c)[N], temp_menu_header<Header>&& header, Args &&...nodes)
+		static auto node(T (&c)[N], temp_menu_header<Header> &&header, Args &&...nodes)
 		{
 			return make_node_impl(c, std::forward<temp_menu_header<Header>>(header), std::forward<Args>(nodes)...);
 		}
 
 		template <typename T, size_t N, typename... Args>
-		static auto node(T(&c)[N], Args &&...nodes)
+		static auto node(T (&c)[N], Args &&...nodes)
 		{
 			return make_node_impl(c, temp_menu_header<temp_menu_header_dummy>(), std::forward<Args>(nodes)...);
 		}
 
 		template <typename Actor>
-		static auto leaf(char const* label, Actor&& actor)
+		static auto leaf(char const *label, Actor &&actor)
 		{
 			using node_type = temp_menu_leaf<Actor>;
 			return temp_menu_holder<tag_temp_menu_leaf, node_type>{
-				node_type{ label, std::forward<Actor>(actor) },
-					child_type(),
+				node_type{label, std::forward<Actor>(actor)},
+				child_type(),
 			};
 		}
 
 		template <typename Actor>
-		static auto header(Actor&& actor)
+		static auto header(Actor &&actor)
 		{
 			return temp_menu_header<Actor>{std::forward<Actor>(actor)};
+		}
+
+		template <typename Actor>
+		static auto popup(popup_menu_key_type &&key, Actor &&actor)
+		{
+			using node_type = menu_popup<popup_menu_key_type, buff_if_type, data_if_type, Actor>;
+			auto popup = child_type((base_type *)new node_type(std::forward<Actor>(actor)));
+			return std::make_pair(std::move(key), std::move(popup));
 		}
 	};
 
 }
 
-struct data_node
+namespace my_menu
 {
-	char const* label;
-	size_t len;
-
-	static constexpr char charno_data_label[] = "<no data>";
-	static constexpr size_t no_data_label_len = sizeof(charno_data_label);
-
-	data_node() : label(nullptr), len(0) {
-
-	}
-	data_node(char const* str) : label(str), len(strlen(str)) {
-
-	}
-
-	operator bool()
+	enum class popup_menu
 	{
-		return label != nullptr;
-	}
+		progress,
+		alert,
+	};
 
-	void get_label(char* buffer, size_t buff_size) {
-		if (label != nullptr) {
-			std::memcpy(buffer, label, std::min(len + 1, buff_size));
+	struct popup_progress
+	{
+		lib_menu::response_t on_entry()
+		{
+			return lib_menu::response_t::OK;
 		}
-		else {
-			std::memcpy(buffer, charno_data_label, std::min(no_data_label_len, buff_size));
+		lib_menu::response_t on_confirm(size_t index)
+		{
+			return lib_menu::response_t::ExitPopup;
 		}
-	}
-};
+		void on_render()
+		{
+			std::cout << "popup_progress" << std::endl;
+		}
+	};
 
-data_node data_c[] = {
-	data_node{"item1"},
-	data_node{},
-	data_node{"item3"},
-};
-
-struct header_root_menu
-{
-	void operator()(void* data)
+	struct data_node
 	{
-		std::cout << "<header_root_menu>" << std::endl;
-	}
-};
-struct header_menu_1
-{
-	void operator()(void* data)
+		char const *label;
+		size_t len;
+
+		static constexpr char charno_data_label[] = "<no data>";
+		static constexpr size_t no_data_label_len = sizeof(charno_data_label);
+
+		data_node() : label(nullptr), len(0)
+		{
+		}
+		data_node(char const *str) : label(str), len(strlen(str))
+		{
+		}
+
+		operator bool()
+		{
+			return label != nullptr;
+		}
+
+		void get_label(char *buffer, size_t buff_size)
+		{
+			if (label != nullptr)
+			{
+				std::memcpy(buffer, label, std::min(len + 1, buff_size));
+			}
+			else
+			{
+				std::memcpy(buffer, charno_data_label, std::min(no_data_label_len, buff_size));
+			}
+		}
+	};
+
+	data_node data_c[] = {
+		data_node{"item1"},
+		data_node{},
+		data_node{"item3"},
+	};
+
+	struct header_root_menu
 	{
-		std::cout << "<header_menu_1>" << std::endl;
-	}
-};
-
-struct actor_back
-{
-	/*
-	actor_back(){
-		// ctor
-	}
-	actor_back(actor_back const& obj){
-		std::cout << "copy ctor" << std::endl;
-	}
-	actor_back(actor_back &&obj)
+		void operator()(void *data)
+		{
+			std::cout << "<header_root_menu>" << std::endl;
+		}
+	};
+	struct header_menu_1
 	{
-		std::cout << "move ctor" << std::endl;
-	}
-	*/
+		void operator()(void *data)
+		{
+			std::cout << "<header_menu_1>" << std::endl;
+		}
+	};
 
-	lib_menu::response_t on_entry()
+	struct actor_back
 	{
-		return lib_menu::response_t::ReqBack;
-	}
-	lib_menu::response_t on_confirm(size_t index)
+		/*
+		actor_back(){
+			// ctor
+		}
+		actor_back(actor_back const& obj){
+			std::cout << "copy ctor" << std::endl;
+		}
+		actor_back(actor_back &&obj)
+		{
+			std::cout << "move ctor" << std::endl;
+		}
+		*/
+
+		lib_menu::response_t on_entry()
+		{
+			return lib_menu::response_t::ReqBack;
+		}
+		lib_menu::response_t on_confirm(size_t index)
+		{
+			return lib_menu::response_t::ReqBack;
+		}
+	};
+
+	struct my_buffer_interface
 	{
-		return lib_menu::response_t::ReqBack;
-	}
-};
+		static constexpr size_t BufferRowMax = lib_menu::BufferRowMax;
+		static constexpr size_t BufferColMax = lib_menu::BufferColMax;
 
-struct my_buffer_interface
-{
-	static constexpr size_t BufferRowMax = lib_menu::BufferRowMax;
-	static constexpr size_t BufferColMax = lib_menu::BufferColMax;
+		char buffer[lib_menu::BufferRowMax][lib_menu::BufferColMax];
+		size_t pos;
 
-	char buffer[lib_menu::BufferRowMax][lib_menu::BufferColMax];
-	size_t pos;
+		my_buffer_interface() : buffer{0}, pos{0}
+		{
+		}
+	};
+	my_buffer_interface buffer;
 
-	my_buffer_interface() : buffer{ 0 }, pos{ 0 }
-	{
-	}
-};
-my_buffer_interface buffer;
+	using lm = lib_menu::builder<my_buffer_interface, popup_menu>;
 
-using lm = lib_menu::builder<my_buffer_interface>;
+	auto menu_back = lm::leaf("[戻る]", actor_back{});
 
-auto menu_back = lm::leaf("[戻る]", actor_back{});
+	// clang-format off
+	auto menu_mng = lm::make_menu(
+		buffer,
+		lm::header(header_root_menu()),
 
-auto menu_mng = lm::make_menu(
-	buffer,
-	lm::header(header_root_menu()),
+		lm::node("menu_1",
+			lm::header(header_menu_1()),
 
-	lm::node("menu_1",
-		lm::header(header_menu_1()),
-
-		lm::node(data_c,
-			lm::leaf("dyn_menu_1", actor_back{}),
-			lm::leaf("dyn_menu_2", actor_back{}),
-			lm::leaf("dyn_menu_3", actor_back{}),
-			menu_back
-		),
-		lm::leaf("menu_1_2", actor_back{}),
-		menu_back
-	),
-
-	lm::node("menu_2",
-		lm::leaf("menu_2_1", actor_back{}),
-		lm::leaf("menu_2_2", actor_back{}),
-		lm::leaf("menu_2_3", actor_back{}),
-		menu_back
-	),
-
-	lm::node("menu_3",
-		lm::node("menu_3_1",
-			lm::leaf("menu_3_1_1", actor_back{}),
-			lm::node("menu_3_1_2",
-				lm::leaf("menu_3_1_2_1", actor_back{}),
-				lm::leaf("menu_3_1_2_2", actor_back{}),
-				lm::leaf("menu_3_1_2_3", actor_back{}),
+			lm::node(data_c,
+				lm::leaf("dyn_menu_1", actor_back{}),
+				lm::leaf("dyn_menu_2", actor_back{}),
+				lm::leaf("dyn_menu_3", actor_back{}),
 				menu_back
 			),
-			lm::leaf("menu_3_1_3", actor_back{}),
+			lm::leaf("menu_1_2", actor_back{}),
 			menu_back
 		),
-		lm::leaf("menu_3_2", actor_back{}),
-		menu_back
-	),
 
-	lm::leaf("test", actor_back{}),
-	lm::leaf("Version", actor_back{})
-).add();
+		lm::node("menu_2",
+			lm::leaf("menu_2_1", actor_back{}),
+			lm::leaf("menu_2_2", actor_back{}),
+			lm::leaf("menu_2_3", actor_back{}),
+			menu_back
+		),
 
-void event_next()
-{
-	std::cout << "[event:[SelectNext]]" << std::endl;
-	menu_mng.on_select_next();
-}
-void event_prev()
-{
-	std::cout << "[event:[SelectPrev]]" << std::endl;
-	menu_mng.on_select_prev();
-}
-void event_confirm()
-{
-	std::cout << "[event:[Confirm]]" << std::endl;
-	menu_mng.on_confirm();
+		lm::node("menu_3",
+			lm::node("menu_3_1",
+				lm::leaf("menu_3_1_1", actor_back{}),
+				lm::node("menu_3_1_2",
+					lm::leaf("menu_3_1_2_1", actor_back{}),
+					lm::leaf("menu_3_1_2_2", actor_back{}),
+					lm::leaf("menu_3_1_2_3", actor_back{}),
+					menu_back
+				),
+				lm::leaf("menu_3_1_3", actor_back{}),
+				menu_back
+			),
+			lm::leaf("menu_3_2", actor_back{}),
+			menu_back
+		),
+
+		lm::leaf("test", actor_back{}),
+		lm::leaf("Version", actor_back{})
+	).add(lm::popup(popup_menu::progress, popup_progress{}));
+	// clang-format on
+
+	void event_next()
+	{
+		std::cout << "[event:[SelectNext]]" << std::endl;
+		menu_mng.on_select_next();
+	}
+	void event_prev()
+	{
+		std::cout << "[event:[SelectPrev]]" << std::endl;
+		menu_mng.on_select_prev();
+	}
+	void event_confirm()
+	{
+		std::cout << "[event:[Confirm]]" << std::endl;
+		menu_mng.on_confirm();
+	}
+	void event_popup(popup_menu tgt)
+	{
+		menu_mng.on_popup(tgt);
+	}
 }
 
 int main()
 {
+	using namespace my_menu;
+
 	menu_mng.init();
 	menu_mng.on_entry();
 	event_next();
@@ -1154,6 +1350,8 @@ int main()
 	event_next();
 	event_next();
 	event_next();
+	event_popup(popup_menu::progress);
+	event_confirm();
 
 	return 0;
 }
