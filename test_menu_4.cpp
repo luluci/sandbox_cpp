@@ -131,6 +131,7 @@ namespace lib_menu {
 			return gen_node2index_table_array_impl<Tuple>(std::make_index_sequence<std::tuple_size_v<Tuple>>());
 		}
 	}
+
 	template <typename BuffIf, typename DataIf>
 	struct menu_node_base
 	{
@@ -150,7 +151,7 @@ namespace lib_menu {
 
 		}
 		menu_node_base(children_type&& children)
-			: children_(std::move(children))
+			: children_(std::move(children)), buff_if_(nullptr), data_if_(nullptr)
 		{
 
 		}
@@ -674,14 +675,13 @@ namespace lib_menu {
 		{
 			// childからparentに渡すデータ
 			base_type* next_node;
-			// impl::node_if::children_type* children_ptr;
 			size_t menu_count;
 			size_t select_index;
 			// parentからchildに渡すデータ
 			void* next_dyn_data;
 			size_t dyn_index;
 
-			data_interface() : next_node(nullptr) /*, next_dyn_data(nullptr), children_ptr(nullptr), menu_count(0), select_index(0), dyn_index(0)*/
+			data_interface() : next_node(nullptr), menu_count(0), select_index(0), next_dyn_data(nullptr), dyn_index(0)
 			{
 			}
 		};
@@ -1020,6 +1020,19 @@ struct header_menu_1
 
 struct actor_back
 {
+	/*
+	actor_back(){
+		// ctor
+	}
+	actor_back(actor_back const& obj){
+		std::cout << "copy ctor" << std::endl;
+	}
+	actor_back(actor_back &&obj)
+	{
+		std::cout << "move ctor" << std::endl;
+	}
+	*/
+
 	lib_menu::response_t on_entry()
 	{
 		return lib_menu::response_t::ReqBack;
