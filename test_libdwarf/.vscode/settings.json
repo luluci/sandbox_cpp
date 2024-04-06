@@ -7,7 +7,6 @@
         "iostream": "cpp"
     },
     "C_Cpp.default.compilerPath": "D:\\msys64\\mingw64\\bin\\g++.exe",
-
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.cmakePath": "D:\\msys64\\mingw64\\bin\\cmake.exe",
     "cmake.generator": "Ninja",
@@ -16,5 +15,9 @@
     },
     "cmake.additionalCompilerSearchDirs": [
         "D:\\msys64\\mingw64\\bin"
-    ]
+    ],
+    "C_Cpp.default.systemIncludePath": [
+        "D:\\msys64\\usr\\local\\libdwarf_092\\include"
+    ],
+    "editor.formatOnSave": true
 }
