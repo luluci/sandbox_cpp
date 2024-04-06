@@ -1,0 +1,20 @@
+{
+    "C_Cpp.default.includePath": [
+        "D:\\msys64\\usr\\local\\libdwarf_092\\include"
+    ],
+    "files.associations": {
+        "xstring": "cpp",
+        "iostream": "cpp"
+    },
+    "C_Cpp.default.compilerPath": "D:\\msys64\\mingw64\\bin\\g++.exe",
+
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.cmakePath": "D:\\msys64\\mingw64\\bin\\cmake.exe",
+    "cmake.generator": "Ninja",
+    "cmake.configureSettings": {
+        "CMAKE_MAKE_PROGRAM": "D:/msys64/mingw64/bin/ninja.exe"
+    },
+    "cmake.additionalCompilerSearchDirs": [
+        "D:\\msys64\\mingw64\\bin"
+    ]
+}

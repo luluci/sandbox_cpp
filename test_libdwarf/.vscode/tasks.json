@@ -1,0 +1,39 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cmake",
+            "label": "CMake: build",
+            "command": "build",
+            "targets": [
+                ""
+            ],
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "CMake テンプレート ビルド タスク"
+        },
+        {
+            "type": "cppbuild",
+            "label": "C/C++: g++.exe アクティブなファイルのビルド",
+            "command": "D:/msys64/mingw64/bin/g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe"
+            ],
+            "options": {
+                "cwd": "D:/msys64/mingw64/bin"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "デバッガーによって生成されたタスク。"
+        }
+    ]
+}

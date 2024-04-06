@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Win32_msys2_mingw64",
+            "includePath": [
+                "D:/msys64/usr/local/libdwarf_092/include"
+            ],
+            "compilerPath": "D:/msys64/mingw64/bin/g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "windows-clang-x64",
+            "defines": [
+                "ESP32"
+            ],
+            "mergeConfigurations": false,
+            "browse": {
+                "path": [
+                    "D:/msys64/usr/local/libdwarf_092/include",
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}
