@@ -15,15 +15,190 @@
 
 namespace {
 
-enum class DW_FORM_offset_kind_t : uint8_t
-{
-    debug_info,   // .debug_info 上のオフセット
-    debug_types,  // .debug_types 上のオフセット
+// Dwarf expression 計算機
+class dwarf_expr_t {
+    enum class ope : uint8_t
+    {
+        lit0    = 0x30,
+        lit1    = 0x31,
+        lit2    = 0x32,
+        lit3    = 0x33,
+        lit4    = 0x34,
+        lit5    = 0x35,
+        lit6    = 0x36,
+        lit7    = 0x37,
+        lit8    = 0x38,
+        lit9    = 0x39,
+        lit10   = 0x3A,
+        lit11   = 0x3B,
+        lit12   = 0x3C,
+        lit13   = 0x3D,
+        lit14   = 0x3E,
+        lit15   = 0x3F,
+        lit16   = 0x40,
+        lit17   = 0x41,
+        lit18   = 0x42,
+        lit19   = 0x43,
+        lit20   = 0x44,
+        lit21   = 0x45,
+        lit22   = 0x46,
+        lit23   = 0x47,
+        lit24   = 0x48,
+        lit25   = 0x49,
+        lit26   = 0x4A,
+        lit27   = 0x4B,
+        lit28   = 0x4C,
+        lit29   = 0x4D,
+        lit30   = 0x4E,
+        lit31   = 0x4F,
+        addr    = 0x03,
+        const1u = 0x08,
+        const1s = 0x09,
+        const2u = 0x0A,
+        const2s = 0x0B,
+        const4u = 0x0C,
+        const4s = 0x0D,
+        const8u = 0x0E,
+        const8s = 0x0F,
+        constu  = 0x10,
+        consts  = 0x11,
+        // 2.5.1.2 Register Based Addressing,
+        fbreg  = 0x91,
+        breg0  = 0x70,
+        breg1  = 0x71,
+        breg2  = 0x72,
+        breg3  = 0x73,
+        breg4  = 0x74,
+        breg5  = 0x75,
+        breg6  = 0x76,
+        breg7  = 0x77,
+        breg8  = 0x78,
+        breg9  = 0x79,
+        breg10 = 0x7A,
+        breg11 = 0x7B,
+        breg12 = 0x7C,
+        breg13 = 0x7D,
+        breg14 = 0x7E,
+        breg15 = 0x7F,
+        breg16 = 0x80,
+        breg17 = 0x81,
+        breg18 = 0x82,
+        breg19 = 0x83,
+        breg20 = 0x84,
+        breg21 = 0x85,
+        breg22 = 0x86,
+        breg23 = 0x87,
+        breg24 = 0x88,
+        breg25 = 0x89,
+        breg26 = 0x8A,
+        breg27 = 0x8B,
+        breg28 = 0x8C,
+        breg29 = 0x8D,
+        breg30 = 0x8E,
+        breg31 = 0x8F,
+        bregx  = 0x92,
+        // 2.5.1.3 Stack Operations,
+        dup                 = 0x12,
+        drop                = 0x13,
+        pick                = 0x15,
+        over                = 0x14,
+        swap                = 0x16,
+        rot                 = 0x17,
+        deref               = 0x06,
+        deref_size          = 0x94,
+        xderef              = 0x18,
+        xderef_size         = 0x95,
+        push_object_address = 0x97,
+        form_tls_address    = 0x9B,
+        call_frame_cfa      = 0x9C,
+        // 2.5.1.4 Arithmetic and Logical Operations,
+        abs         = 0x19,
+        and_        = 0x1A,
+        div         = 0x1B,
+        minus       = 0x1C,
+        mod         = 0x1D,
+        mul         = 0x1E,
+        neg         = 0x1F,
+        not_        = 0x20,
+        or_         = 0x21,
+        plus        = 0x22,
+        plus_uconst = 0x23,
+        shl         = 0x24,
+        shr         = 0x25,
+        shra        = 0x26,
+        xor_        = 0x27,
+        // 2.5.1.5 Control Flow Operations,
+        eq       = 0x29,
+        ge       = 0x2A,
+        gt       = 0x2B,
+        le       = 0x2C,
+        lt       = 0x2D,
+        ne       = 0x2E,
+        skip     = 0x2F,
+        bra      = 0x28,
+        call2    = 0x98,
+        call4    = 0x99,
+        call_ref = 0x9A,
+        nop      = 0x96,
+        //
+        reg0  = 0x50,
+        reg1  = 0x51,
+        reg2  = 0x52,
+        reg3  = 0x53,
+        reg4  = 0x54,
+        reg5  = 0x55,
+        reg6  = 0x56,
+        reg7  = 0x57,
+        reg8  = 0x58,
+        reg9  = 0x59,
+        reg10 = 0x5A,
+        reg11 = 0x5B,
+        reg12 = 0x5C,
+        reg13 = 0x5D,
+        reg14 = 0x5E,
+        reg15 = 0x5F,
+        reg16 = 0x60,
+        reg17 = 0x61,
+        reg18 = 0x62,
+        reg19 = 0x63,
+        reg20 = 0x64,
+        reg21 = 0x65,
+        reg22 = 0x66,
+        reg23 = 0x67,
+        reg24 = 0x68,
+        reg25 = 0x69,
+        reg26 = 0x6A,
+        reg27 = 0x6B,
+        reg28 = 0x6C,
+        reg29 = 0x6D,
+        reg30 = 0x6E,
+        reg31 = 0x6F
+    };
+
+public:
+    dwarf_expr_t() {
+    }
+
+    void exec(uint8_t ope, uint8_t *buff, size_t buff_size) {
+    }
 };
 
+// 型情報
+struct type_info_t
+{
+    // 制御用情報
+    Dwarf_Off debug_info_offset;
+    Dwarf_Off debug_types_offset;
+    //
+    std::string name;
+};
 // 変数情報
 struct var_info_t
 {
+    // 制御用情報
+    Dwarf_Off debug_info_offset;
+    Dwarf_Off debug_types_offset;
+    //
     std::string name;
     bool external;
     Dwarf_Unsigned decl_file;  // filelistのインデックス
@@ -31,7 +206,6 @@ struct var_info_t
     Dwarf_Unsigned decl_line;
     Dwarf_Unsigned decl_column;
     Dwarf_Off type;  // reference
-    DW_FORM_offset_kind_t type_kind;
 };
 
 template <typename T, typename ReturnT = std::optional<T>>
@@ -61,10 +235,33 @@ std::optional<DW_FORM_ref_result_t> get_DW_FORM_ref(Dwarf_Attribute dw_attr) {
     }
     return std::nullopt;
 }
-// dwarf_formexprloc
-
+// DW_FORM_sec_offset
+std::optional<DW_FORM_ref_result_t> get_DW_FORM_sec_offset(Dwarf_Attribute dw_attr) {
+    DW_FORM_ref_result_t ref_value;
+    Dwarf_Error error = nullptr;
+    int result;
+    result = dwarf_global_formref_b(dw_attr, &ref_value.return_offset, &ref_value.is_info, &error);
+    if (result == DW_DLV_OK) {
+        return std::optional<DW_FORM_ref_result_t>(ref_value);
+    }
+    return std::nullopt;
+}
+// DW_FORM_exprloc
 template <typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM(Dwarf_Attribute dw_attr) {
+ReturnT get_DW_FORM_exprloc(Dwarf_Attribute dw_attr) {
+    Dwarf_Unsigned return_exprlen = 0;
+    Dwarf_Ptr block_ptr           = nullptr;
+    Dwarf_Error error             = nullptr;
+    int result;
+    result = dwarf_formexprloc(dw_attr, &return_exprlen, &block_ptr, &error);
+    if (result == DW_DLV_OK) {
+        return ReturnT(ref_value);
+    }
+    return std::nullopt;
+}
+
+template <typename T, typename U, typename ReturnT = std::optional<T>>
+ReturnT get_DW_FORM(Dwarf_Attribute dw_attr, U &info) {
     Dwarf_Half form;
     Dwarf_Error error = nullptr;
     int result;
@@ -74,34 +271,60 @@ ReturnT get_DW_FORM(Dwarf_Attribute dw_attr) {
         return std::nullopt;
     }
     // form
-    if constexpr (std::is_same_v<T, DW_FORM_ref_result_t>) {
-        switch (form) {
-            case DW_FORM_ref_udata:
-            case DW_FORM_ref_addr:
-            case DW_FORM_ref1:
-            case DW_FORM_ref2:
-            case DW_FORM_ref4:
-            case DW_FORM_ref8:
-                return get_DW_FORM_ref(dw_attr);
-        }
-    } else if constexpr (std::is_same_v<T, Dwarf_Signed>) {
-        switch (form) {
-            case DW_FORM_sec_offset:
-                return get_DW_FORM_exprloc<T>(dw_attr);
-        }
-    } else if constexpr (std::is_same_v<T, Dwarf_Unsigned>) {
-        switch (form) {
-            case DW_FORM_indirect:
-            case DW_FORM_block:
-            case DW_FORM_udata:
-                return get_DW_FORM_udata<T>(dw_attr);
-            case DW_FORM_data4:
-            case DW_FORM_data8:
-            case DW_FORM_exprloc:
-                return get_DW_FORM_exprloc<T>(dw_attr);
-        }
-    } else {
-        // ???
+    switch (form) {
+        case DW_FORM_ref_addr:
+        case DW_FORM_ref1:
+        case DW_FORM_ref2:
+        case DW_FORM_ref4:
+        case DW_FORM_ref8:
+        case DW_FORM_ref_udata: {
+            auto ret = get_DW_FORM_ref(dw_attr);
+            if (ret) {
+                T addr = ret->return_offset;
+                if (ret->is_info == true) {
+                    // .debug_info の先頭からのoffsetを加算する
+                    addr += info.debug_info_offset;
+                } else {
+                    // .debug_types の先頭からのoffsetを加算する
+                    addr += info.debug_types_offset;
+                }
+                return ReturnT(addr);
+            }
+        } break;
+
+        case DW_FORM_indirect:
+            break;
+
+        case DW_FORM_sec_offset: {
+            auto ret = get_DW_FORM_sec_offset(dw_attr);
+            if (ret) {
+                T addr = ret->return_offset;
+                if (ret->is_info == true) {
+                    // .debug_info の先頭からのoffsetを加算する
+                    addr += info.debug_info_offset;
+                } else {
+                    // .debug_types の先頭からのoffsetを加算する
+                    addr += info.debug_types_offset;
+                }
+                return ReturnT(addr);
+            }
+        } break;
+
+        case DW_FORM_block2:
+        case DW_FORM_block4:
+        case DW_FORM_block:
+        case DW_FORM_block1:
+            break;
+
+        case DW_FORM_udata:
+        case DW_FORM_data2:
+        case DW_FORM_data4:
+        case DW_FORM_data8:
+        case DW_FORM_data1:
+            return get_DW_FORM_udata<T>(dw_attr);
+
+        case DW_FORM_exprloc:
+            return get_DW_FORM_exprloc<T>(dw_attr);
     }
 
     return std::nullopt;
@@ -114,7 +337,7 @@ ReturnT get_DW_FORM(Dwarf_Attribute dw_attr) {
 // exprloc, loclistptr
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_location(Dwarf_Attribute dw_attr, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr);
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, info);
     if (result) {
         info.decl_column = *result;
     } else {
@@ -181,14 +404,9 @@ void get_DW_AT_decl_line(Dwarf_Attribute dw_attr, T &info) {
 // DW_AT_type
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_type(Dwarf_Attribute dw_attr, T &info) {
-    auto result = get_DW_FORM<DW_FORM_ref_result_t>(dw_attr);
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr);
     if (result) {
-        info.type = result->return_offset;
-        if (result->is_info == true) {
-            info.type_kind = DW_FORM_offset_kind_t::debug_info;
-        } else {
-            info.type_kind = DW_FORM_offset_kind_t::debug_types;
-        }
+        info.type = *result;
     } else {
         info.type = 0;
     }
