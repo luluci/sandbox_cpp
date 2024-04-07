@@ -1,5 +1,6 @@
 #pragma once
 
+#define LIBDWARF_STATIC 1
 #include <dwarf.h>
 #include <libdwarf.h>
 
@@ -63,7 +64,7 @@ public:
         int result;
         bool finish = false;
 
-        // CU取得
+        // compile_unit取得
         while (!finish) {
             result = dwarf_next_cu_header_e(dw_dbg, dw_is_info, &dw_cu_die, &dw_cu_header_length, &dw_version_stamp, &dw_abbrev_offset,
                                             &dw_address_size, &dw_length_size, &dw_extension_size, &dw_type_signature, &dw_typeoffset,
@@ -87,13 +88,11 @@ public:
                 return;
             }
 
+            // DW_TAG_compile_unitチェック
             Dwarf_Half tag;
-            // Dwarf_Die child;
-            // dwarf_child(dw_cu_die, &child, &dw_error);
-
             dwarf_tag(dw_cu_die, &tag, &dw_error);
             if (tag == DW_TAG_compile_unit) {
-                printf("get DW_TAG_compile_unit");
+                analyze_cu(dw_cu_die);
             }
 
             dwarf_dealloc_die(dw_cu_die);
@@ -108,5 +107,79 @@ public:
         auto result = dwarf_finish(dw_dbg);
         printf("dwarf_finish : result : %d\n", result);
         return (result == DW_DLV_OK);
+    }
+
+private:
+    void analyze_cu(Dwarf_Die dw_cu_die) {
+        // 先にcompile_unitの情報を取得
+        analyze_die_TAG_compile_unit(dw_cu_die);
+
+        // .debug_line解析
+
+        // https://www.prevanders.net/libdwarfdoc/group__examplecuhdre.html
+
+        int result;
+        int depth = 0;
+
+        // childがcompile_unit配下の最初のDIEのはず
+        Dwarf_Die child;
+        result = dwarf_child(dw_cu_die, &child, &dw_error);
+        // childを取得できなかったら終了
+        if (result == DW_DLV_ERROR) {
+            // printf("Error in dwarf_child , depth %d \n", depth);
+            //  exit(EXIT_FAILURE);
+            return;
+        }
+        if (result != DW_DLV_OK) {
+            return;
+        }
+
+        Dwarf_Die cur_die = child;
+        Dwarf_Die sib_die = nullptr;
+
+        // compile_unit配下のDIEをすべてチェック
+        // compile_unit直下のDIEを解析にかける
+        // compile_unitのchildを起点にsiblingをすべて取得すればいいはず
+        while (cur_die != nullptr) {
+            // 解析
+            analyze_die(cur_die);
+
+            // 次のDIEを検索
+            result = dwarf_siblingof_c(cur_die, &sib_die, &dw_error);
+            // エラー検出
+            if (result == DW_DLV_ERROR) {
+                printf("Error in dwarf_siblingof_c , depth %d \n", depth);
+                break;
+                // exit(EXIT_FAILURE);
+            }
+            // すべてのDIEをチェック完了
+            if (result == DW_DLV_NO_ENTRY) {
+                break;
+            }
+            // 次のDIEを取得出来たら
+            // cur_dieはnullptrにしない設計だが一応チェック
+            // 前DIE(cur_die)を解放してsib_dieを今回DIEとする
+            if (cur_die != nullptr) {
+                dwarf_dealloc(dw_dbg, cur_die, DW_DLA_DIE);
+                cur_die = nullptr;
+            }
+            cur_die = sib_die;
+            sib_die = nullptr;
+        }
+
+        if (cur_die != nullptr) {
+            // 子DIE解放
+            dwarf_dealloc(dw_dbg, cur_die, DW_DLA_DIE);
+            cur_die = nullptr;
+        }
+    }
+
+    void analyze_die(Dwarf_Die dw_cu_die) {
+        Dwarf_Half tag;
+        dwarf_tag(dw_cu_die, &tag, &dw_error);
+        printf("tag: %d\n", tag);
+    }
+
+    void analyze_die_TAG_compile_unit(Dwarf_Die dw_cu_die) {
     }
 };
