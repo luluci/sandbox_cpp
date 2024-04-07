@@ -4,7 +4,9 @@
 #include <dwarf.h>
 #include <libdwarf.h>
 
+#include <cstdint>
 #include <cstdio>
+#include <optional>
 #include <string>
 #include <type_traits>
 
@@ -13,36 +15,116 @@
 
 namespace {
 
+enum class DW_FORM_offset_kind_t : uint8_t
+{
+    debug_info,   // .debug_info 上のオフセット
+    debug_types,  // .debug_types 上のオフセット
+};
+
 // 変数情報
 struct var_info_t
 {
     std::string name;
     bool external;
+    Dwarf_Unsigned decl_file;  // filelistのインデックス
+    bool decl_file_is_external;
+    Dwarf_Unsigned decl_line;
+    Dwarf_Unsigned decl_column;
+    Dwarf_Off type;  // reference
+    DW_FORM_offset_kind_t type_kind;
 };
 
-// DW_AT_external 実装
-template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_external(Dwarf_Attribute dw_attr, T &info) {
-    printf("no implemented!\n");
-}
-template <Dwarf_Half DW_TAG>
-void get_DW_AT_external(Dwarf_Attribute dw_attr, var_info_t &info) {
-    Dwarf_Bool returned_bool = 0;
-    Dwarf_Error error        = nullptr;
+template <typename T, typename ReturnT = std::optional<T>>
+ReturnT get_DW_FORM_udata(Dwarf_Attribute dw_attr) {
+    Dwarf_Unsigned data;
+    Dwarf_Error error = nullptr;
     int result;
-    result = dwarf_formflag(dw_attr, &returned_bool, &error);
+    result = dwarf_formudata(dw_attr, &data, &error);
     if (result == DW_DLV_OK) {
-        info.external = (returned_bool == 1);
+        return ReturnT(data);
+    }
+    return std::nullopt;
+}
+//
+struct DW_FORM_ref_result_t
+{
+    Dwarf_Off return_offset;
+    Dwarf_Bool is_info;
+};
+std::optional<DW_FORM_ref_result_t> get_DW_FORM_ref(Dwarf_Attribute dw_attr) {
+    DW_FORM_ref_result_t ref_value;
+    Dwarf_Error error = nullptr;
+    int result;
+    result = dwarf_formref(dw_attr, &ref_value.return_offset, &ref_value.is_info, &error);
+    if (result == DW_DLV_OK) {
+        return std::optional<DW_FORM_ref_result_t>(ref_value);
+    }
+    return std::nullopt;
+}
+// dwarf_formexprloc
+
+template <typename T, typename ReturnT = std::optional<T>>
+ReturnT get_DW_FORM(Dwarf_Attribute dw_attr) {
+    Dwarf_Half form;
+    Dwarf_Error error = nullptr;
+    int result;
+    // form形式を取得
+    result = dwarf_whatform(dw_attr, &form, &error);
+    if (result != DW_DLV_OK) {
+        return std::nullopt;
+    }
+    // form
+    if constexpr (std::is_same_v<T, DW_FORM_ref_result_t>) {
+        switch (form) {
+            case DW_FORM_ref_udata:
+            case DW_FORM_ref_addr:
+            case DW_FORM_ref1:
+            case DW_FORM_ref2:
+            case DW_FORM_ref4:
+            case DW_FORM_ref8:
+                return get_DW_FORM_ref(dw_attr);
+        }
+    } else if constexpr (std::is_same_v<T, Dwarf_Signed>) {
+        switch (form) {
+            case DW_FORM_sec_offset:
+                return get_DW_FORM_exprloc<T>(dw_attr);
+        }
+    } else if constexpr (std::is_same_v<T, Dwarf_Unsigned>) {
+        switch (form) {
+            case DW_FORM_indirect:
+            case DW_FORM_block:
+            case DW_FORM_udata:
+                return get_DW_FORM_udata<T>(dw_attr);
+            case DW_FORM_data4:
+            case DW_FORM_data8:
+            case DW_FORM_exprloc:
+                return get_DW_FORM_exprloc<T>(dw_attr);
+        }
+    } else {
+        // ???
+    }
+
+    return std::nullopt;
+}
+
+// DW_AT_* 参考
+// 7.5.4 Attribute Encodings
+
+// DW_AT_location
+// exprloc, loclistptr
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_location(Dwarf_Attribute dw_attr, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr);
+    if (result) {
+        info.decl_column = *result;
+    } else {
+        info.decl_column = 0;
     }
 }
 
 // DW_AT_name 実装
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_name(Dwarf_Attribute dw_attr, T &info) {
-    printf("no implemented!\n");
-}
-template <Dwarf_Half DW_TAG>
-void get_DW_AT_name(Dwarf_Attribute dw_attr, var_info_t &info) {
     char *str         = nullptr;
     Dwarf_Error error = nullptr;
     int result;
@@ -51,6 +133,88 @@ void get_DW_AT_name(Dwarf_Attribute dw_attr, var_info_t &info) {
         info.name = str;
     }
 }
+// template <Dwarf_Half DW_TAG>
+// void get_DW_AT_name(Dwarf_Attribute dw_attr, var_info_t &info) {
+//     char *str         = nullptr;
+//     Dwarf_Error error = nullptr;
+//     int result;
+//     result = dwarf_formstring(dw_attr, &str, &error);
+//     if (result == DW_DLV_OK) {
+//         info.name = str;
+//     }
+// }
+
+// DW_AT_decl_column
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_decl_column(Dwarf_Attribute dw_attr, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr);
+    if (result) {
+        info.decl_column = *result;
+    } else {
+        info.decl_column = 0;
+    }
+}
+
+// DW_AT_decl_file 実装
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_decl_file(Dwarf_Attribute dw_attr, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr);
+    if (result) {
+        info.decl_file             = *result;
+        info.decl_file_is_external = (info.decl_file != 1);
+    } else {
+        info.decl_file = 0;
+    }
+}
+
+// DW_AT_decl_line
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_decl_line(Dwarf_Attribute dw_attr, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr);
+    if (result) {
+        info.decl_line = *result;
+    } else {
+        info.decl_line = 0;
+    }
+}
+
+// DW_AT_type
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_type(Dwarf_Attribute dw_attr, T &info) {
+    auto result = get_DW_FORM<DW_FORM_ref_result_t>(dw_attr);
+    if (result) {
+        info.type = result->return_offset;
+        if (result->is_info == true) {
+            info.type_kind = DW_FORM_offset_kind_t::debug_info;
+        } else {
+            info.type_kind = DW_FORM_offset_kind_t::debug_types;
+        }
+    } else {
+        info.type = 0;
+    }
+}
+
+// DW_AT_external 実装
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_external(Dwarf_Attribute dw_attr, T &info) {
+    Dwarf_Bool returned_bool = 0;
+    Dwarf_Error error        = nullptr;
+    int result;
+    result = dwarf_formflag(dw_attr, &returned_bool, &error);
+    if (result == DW_DLV_OK) {
+        info.external = (returned_bool == 1);
+    }
+}
+// template <Dwarf_Half DW_TAG>
+// void get_DW_AT_external(Dwarf_Attribute dw_attr, var_info_t &info) {
+//     Dwarf_Bool returned_bool = 0;
+//     Dwarf_Error error        = nullptr;
+//     int result;
+//     result = dwarf_formflag(dw_attr, &returned_bool, &error);
+//     if (result == DW_DLV_OK) {
+//         info.external = (returned_bool == 1);
+//     }
+// }
 
 //
 template <Dwarf_Half DW_TAG, typename T>
@@ -67,19 +231,16 @@ template <Dwarf_Half DW_TAG, typename T>
 void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, T &info) {
     // Attrubute解析
     switch (attrnum) {
-        case DW_AT_external:
-            get_DW_AT_external<DW_TAG>(dw_attr, info);
+        case DW_AT_sibling:
             break;
+        case DW_AT_location:
+            get_DW_AT_location<DW_TAG>(dw_attr, info);
+            break;
+
         case DW_AT_name:
             get_DW_AT_name<DW_TAG>(dw_attr, info);
             break;
 
-        case DW_AT_declaration:
-            get_DW_AT_declaration<DW_TAG>(dw_attr, info);
-            break;
-
-        case DW_AT_sibling:
-        case DW_AT_location:
         case DW_AT_ordering:
         case DW_AT_subscr_data:
         case DW_AT_byte_size:
@@ -119,12 +280,30 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, T &info) {
         case DW_AT_calling_convention:
         case DW_AT_count:
         case DW_AT_data_member_location:
+            break;
+
         case DW_AT_decl_column:
+            get_DW_AT_decl_column<DW_TAG>(dw_attr, info);
+            break;
         case DW_AT_decl_file:
+            get_DW_AT_decl_file<DW_TAG>(dw_attr, info);
+            break;
         case DW_AT_decl_line:
-        // case DW_AT_declaration:
+            get_DW_AT_decl_line<DW_TAG>(dw_attr, info);
+            break;
+
+        case DW_AT_declaration:
+            get_DW_AT_declaration<DW_TAG>(dw_attr, info);
+            break;
+
         case DW_AT_discr_list:
         case DW_AT_encoding:
+            break;
+
+        case DW_AT_external:
+            get_DW_AT_external<DW_TAG>(dw_attr, info);
+            break;
+
         case DW_AT_frame_base:
         case DW_AT_friend:
         case DW_AT_identifier_case:
@@ -134,7 +313,12 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, T &info) {
         case DW_AT_segment:
         case DW_AT_specification:
         case DW_AT_static_link:
+            break;
+
         case DW_AT_type:
+            get_DW_AT_type<DW_TAG>(dw_attr, info);
+            break;
+
         case DW_AT_use_location:
         case DW_AT_variable_parameter:
         case DW_AT_virtuality:
