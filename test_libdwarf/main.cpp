@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    dwarf_info_t di;
+    util_dwarf::dwarf_analyzer di;
     auto result = di.open(argv[1]);
     if (result) {
         di.analyze();
