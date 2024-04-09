@@ -22,10 +22,23 @@ namespace {
 // 戻り値がOKじゃないけどエラーでもないケースある？
 void error_happen(Dwarf_Error *error) {
     char *errmsg = dwarf_errmsg(*error);
+    printf("%s\n", errmsg);
     throw std::runtime_error("libdwarf API error!");
     exit(1);  // 一応書いておく
 }
 }  // namespace
+
+namespace utility {
+Dwarf_Unsigned concat_le(uint8_t const *buff, size_t begin, size_t end) {
+    Dwarf_Unsigned result = 0;
+    size_t shift          = 0;
+    for (size_t i = begin; i < end; i++) {
+        result |= (buff[i] << shift);
+        shift += 8;
+    }
+    return result;
+}
+}  // namespace utility
 
 // Dwarf expression 計算機
 class dwarf_expression {
@@ -37,6 +50,12 @@ public:
     dwarf_expression() : stack_(default_stack_size) {
     }
 
+    bool eval_DW_OP_unimpl(uint8_t *buff, size_t buff_size) {
+        //
+        printf("no implemented! : DW_OP(%02X)\n", buff[0]);
+        return false;
+    }
+    //
     bool eval_DW_OP_addr(uint8_t *buff, size_t buff_size) {
         Dwarf_Unsigned value = 0;
         // little endianで結合
@@ -44,11 +63,17 @@ public:
         // [0]はopeコードなので除外
         for (size_t i = buff_size - 1; i > 0; i--) {
             value <<= 8;
-            value |= buff[buff_size];
+            value |= buff[i];
         }
         //
         stack_.push_back(value);
         //
+        return true;
+    }
+    //
+    template <size_t N>
+    bool eval_DW_OP_lit_N() {
+        stack_.push_back(N);
         return true;
     }
 
@@ -76,69 +101,69 @@ public:
             case DW_OP_addr:
                 return eval_DW_OP_addr(buff, buff_size);
             case DW_OP_lit0:
-                break;
+                return eval_DW_OP_lit_N<0>();
             case DW_OP_lit1:
-                break;
+                return eval_DW_OP_lit_N<1>();
             case DW_OP_lit2:
-                break;
+                return eval_DW_OP_lit_N<2>();
             case DW_OP_lit3:
-                break;
+                return eval_DW_OP_lit_N<3>();
             case DW_OP_lit4:
-                break;
+                return eval_DW_OP_lit_N<4>();
             case DW_OP_lit5:
-                break;
+                return eval_DW_OP_lit_N<5>();
             case DW_OP_lit6:
-                break;
+                return eval_DW_OP_lit_N<6>();
             case DW_OP_lit7:
-                break;
+                return eval_DW_OP_lit_N<7>();
             case DW_OP_lit8:
-                break;
+                return eval_DW_OP_lit_N<8>();
             case DW_OP_lit9:
-                break;
+                return eval_DW_OP_lit_N<9>();
             case DW_OP_lit10:
-                break;
+                return eval_DW_OP_lit_N<10>();
             case DW_OP_lit11:
-                break;
+                return eval_DW_OP_lit_N<11>();
             case DW_OP_lit12:
-                break;
+                return eval_DW_OP_lit_N<12>();
             case DW_OP_lit13:
-                break;
+                return eval_DW_OP_lit_N<13>();
             case DW_OP_lit14:
-                break;
+                return eval_DW_OP_lit_N<14>();
             case DW_OP_lit15:
-                break;
+                return eval_DW_OP_lit_N<15>();
             case DW_OP_lit16:
-                break;
+                return eval_DW_OP_lit_N<16>();
             case DW_OP_lit17:
-                break;
+                return eval_DW_OP_lit_N<17>();
             case DW_OP_lit18:
-                break;
+                return eval_DW_OP_lit_N<18>();
             case DW_OP_lit19:
-                break;
+                return eval_DW_OP_lit_N<19>();
             case DW_OP_lit20:
-                break;
+                return eval_DW_OP_lit_N<20>();
             case DW_OP_lit21:
-                break;
+                return eval_DW_OP_lit_N<21>();
             case DW_OP_lit22:
-                break;
+                return eval_DW_OP_lit_N<22>();
             case DW_OP_lit23:
-                break;
+                return eval_DW_OP_lit_N<23>();
             case DW_OP_lit24:
-                break;
+                return eval_DW_OP_lit_N<24>();
             case DW_OP_lit25:
-                break;
+                return eval_DW_OP_lit_N<25>();
             case DW_OP_lit26:
-                break;
+                return eval_DW_OP_lit_N<26>();
             case DW_OP_lit27:
-                break;
+                return eval_DW_OP_lit_N<27>();
             case DW_OP_lit28:
-                break;
+                return eval_DW_OP_lit_N<28>();
             case DW_OP_lit29:
-                break;
+                return eval_DW_OP_lit_N<29>();
             case DW_OP_lit30:
-                break;
+                return eval_DW_OP_lit_N<30>();
             case DW_OP_lit31:
-                break;
+                return eval_DW_OP_lit_N<31>();
             case DW_OP_const1u:
                 break;
             case DW_OP_const1s:
@@ -373,7 +398,7 @@ public:
                 break;
         }
 
-        return false;
+        return eval_DW_OP_unimpl(buff, buff_size);
     }
 };
 
@@ -393,6 +418,9 @@ struct var_info
     Dwarf_Unsigned decl_column;
     Dwarf_Off type;  // reference
     Dwarf_Off location;
+    bool declaration;  // 不完全型のときtrue
+    Dwarf_Unsigned const_value;
+    Dwarf_Unsigned sibling;
 };
 
 // compile_unitから取得する情報
@@ -453,9 +481,64 @@ ReturnT get_DW_FORM_block1(Dwarf_Attribute dw_attr, dwarf_info &di) {
         error_happen(&error);
         return std::nullopt;
     }
+    // [ length data1 data2 ... ] or [ DWARF expr ]
+    Dwarf_Unsigned len   = 1 + ((uint8_t *)tempb->bl_data)[0];
+    Dwarf_Unsigned value = 0;
+    if (tempb->bl_len == len) {
+        // length byte と valueの要素数が一致するとき、block1として解釈
+        // dataをlittle endianで結合
+        value = utility::concat_le((uint8_t *)tempb->bl_data, 1, tempb->bl_len);
+    } else {
+        // 一致しないとき、DWARF expression として解釈
+        di.dwarf_expr.eval((uint8_t *)tempb->bl_data, tempb->bl_len);
+        auto eval = di.dwarf_expr.pop();
+        if (!eval) {
+            // ありえない
+            printf("error: get_DW_FORM_block1 : DWARF expr logic error.");
+        }
+        value = *eval;
+    }
+
     // https://www.prevanders.net/libdwarfdoc/group__examplediscrlist.html
     dwarf_dealloc(*di.dw_dbg, tempb, DW_DLA_BLOCK);
-    return ReturnT(0);
+    return ReturnT(value);
+}
+//
+template <size_t N, typename T, typename ReturnT = std::optional<T>>
+ReturnT get_DW_FORM_block_N(Dwarf_Attribute dw_attr, dwarf_info &di) {
+    Dwarf_Block *tempb = 0;
+    Dwarf_Error error  = nullptr;
+    int result;
+    result = dwarf_formblock(dw_attr, &tempb, &error);
+    if (result != DW_DLV_OK) {
+        error_happen(&error);
+        return std::nullopt;
+    }
+    // N = 1: [ length data1 data2 ... ] or [ DWARF expr ]
+    // N = 2: [ length1 length2 data1 data2 ... ] or [ DWARF expr ]
+    // N = 4: [ length1 length2 length3 length4 data1 data2 ... ] or [ DWARF expr ]
+    auto buff_ptr        = (uint8_t *)tempb->bl_data;
+    auto buff_len        = tempb->bl_len;
+    Dwarf_Unsigned len   = N + utility::concat_le(buff_ptr, 0, N);
+    Dwarf_Unsigned value = 0;
+    if (buff_len == len) {
+        // length byte と valueの要素数が一致するとき、block<N>として解釈
+        // dataをlittle endianで結合
+        value = utility::concat_le(buff_ptr, N, buff_len);
+    } else {
+        // 一致しないとき、DWARF expression として解釈
+        di.dwarf_expr.eval(buff_ptr, buff_len);
+        auto eval = di.dwarf_expr.pop();
+        if (!eval) {
+            // ありえない
+            printf("error: get_DW_FORM_block1 : DWARF expr logic error.");
+        }
+        value = *eval;
+    }
+
+    // https://www.prevanders.net/libdwarfdoc/group__examplediscrlist.html
+    dwarf_dealloc(*di.dw_dbg, tempb, DW_DLA_BLOCK);
+    return ReturnT(value);
 }
 //
 template <typename T, typename ReturnT = std::optional<T>>
@@ -592,11 +675,14 @@ ReturnT get_DW_FORM(Dwarf_Attribute dw_attr, dwarf_info &di) {
         } break;
 
         case DW_FORM_block2:
+            return get_DW_FORM_block_N<2, T>(dw_attr, di);
         case DW_FORM_block4:
+            return get_DW_FORM_block_N<4, T>(dw_attr, di);
         case DW_FORM_block:
+            printf("no implemented! : DW_FORM_block\n");
             break;
         case DW_FORM_block1:
-            return get_DW_FORM_block1<T>(dw_attr, di);
+            return get_DW_FORM_block_N<1, T>(dw_attr, di);
 
         case DW_FORM_udata:
         case DW_FORM_data2:
@@ -626,7 +712,16 @@ void get_DW_AT_location(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
         info.location = 0;
     }
 }
-
+//
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_const_value(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.const_value = *result;
+    } else {
+        info.const_value = 0;
+    }
+}
 // DW_AT_name 実装
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_name(Dwarf_Attribute dw_attr, T &info) {
@@ -683,7 +778,16 @@ void get_DW_AT_decl_line(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
         info.decl_line = 0;
     }
 }
-
+// DW_AT_sibling
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_sibling(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.sibling = *result;
+    } else {
+        info.sibling = 0;
+    }
+}
 // DW_AT_type
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_type(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
@@ -721,12 +825,19 @@ void get_DW_AT_external(Dwarf_Attribute dw_attr, T &info) {
 //
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_declaration(Dwarf_Attribute dw_attr, T &info) {
-    printf("no implemented!\n");
+    Dwarf_Bool returned_bool = 0;
+    Dwarf_Error error        = nullptr;
+    int result;
+    result = dwarf_formflag(dw_attr, &returned_bool, &error);
+    if (result != DW_DLV_OK) {
+        error_happen(&error);
+    }
+    info.declaration = (returned_bool == 1);
 }
-template <>
-void get_DW_AT_declaration<DW_TAG_variable>(Dwarf_Attribute dw_attr, var_info &info) {
-    printf("no implemented!\n");
-}
+// template <>
+// void get_DW_AT_declaration<DW_TAG_variable>(Dwarf_Attribute dw_attr, var_info &info) {
+//     printf("no implemented! : get_DW_AT_declaration\n");
+// }
 
 // DW_AT_name
 template <Dwarf_Half DW_TAG, typename T>
@@ -734,14 +845,15 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
     // Attrubute解析
     switch (attrnum) {
         case DW_AT_sibling:
-            break;
+            get_DW_AT_sibling<DW_TAG>(dw_attr, di, info);
+            return;
         case DW_AT_location:
             get_DW_AT_location<DW_TAG>(dw_attr, di, info);
-            break;
+            return;
 
         case DW_AT_name:
             get_DW_AT_name<DW_TAG>(dw_attr, info);
-            break;
+            return;
 
         case DW_AT_ordering:
         case DW_AT_subscr_data:
@@ -761,7 +873,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
         case DW_AT_string_length:
         case DW_AT_common_reference:
         case DW_AT_comp_dir:
+            break;
         case DW_AT_const_value:
+            get_DW_AT_const_value<DW_TAG>(dw_attr, di, info);
+            return;
+
         case DW_AT_containing_type:
         case DW_AT_default_value:
         case DW_AT_inline:
@@ -786,17 +902,17 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_decl_column:
             get_DW_AT_decl_column<DW_TAG>(dw_attr, di, info);
-            break;
+            return;
         case DW_AT_decl_file:
             get_DW_AT_decl_file<DW_TAG>(dw_attr, di, info);
-            break;
+            return;
         case DW_AT_decl_line:
             get_DW_AT_decl_line<DW_TAG>(dw_attr, di, info);
-            break;
+            return;
 
         case DW_AT_declaration:
             get_DW_AT_declaration<DW_TAG>(dw_attr, info);
-            break;
+            return;
 
         case DW_AT_discr_list:
         case DW_AT_encoding:
@@ -804,7 +920,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_external:
             get_DW_AT_external<DW_TAG>(dw_attr, info);
-            break;
+            return;
 
         case DW_AT_frame_base:
         case DW_AT_friend:
@@ -819,7 +935,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_type:
             get_DW_AT_type<DW_TAG>(dw_attr, di, info);
-            break;
+            return;
 
         case DW_AT_use_location:
         case DW_AT_variable_parameter:
@@ -890,6 +1006,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
         case DW_AT_loclists_base:
             break;
     }
+
+    // no impl
+    const char *attrname = 0;
+    dwarf_get_AT_name(attrnum, &attrname);
+    printf("no impl : %s (%u)\n", attrname, attrnum);
 }
 
 /// @brief 対象DIEに紐づくattributeを解析して情報を取得する
@@ -1063,6 +1184,8 @@ public:
 
             dwarf_dealloc_die(dw_cu_die);
         }
+
+        return;
     }
 
     bool close() {
