@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -416,8 +417,8 @@ struct var_info
     bool decl_file_is_external;
     Dwarf_Unsigned decl_line;
     Dwarf_Unsigned decl_column;
-    Dwarf_Off type;  // reference
-    Dwarf_Off location;
+    std::optional<Dwarf_Off> type;  // reference
+    std::optional<Dwarf_Off> location;
     bool declaration;  // 不完全型のときtrue
     Dwarf_Unsigned const_value;
     Dwarf_Unsigned sibling;
@@ -708,8 +709,6 @@ void get_DW_AT_location(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
     if (result) {
         info.location = *result;
-    } else {
-        info.location = 0;
     }
 }
 //
@@ -794,8 +793,6 @@ void get_DW_AT_type(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
     if (result) {
         info.type = *result;
-    } else {
-        info.type = 0;
     }
 }
 
@@ -1076,7 +1073,10 @@ public:
         }
     };
 
-    using var_info = ::util_dwarf::var_info;
+    using var_info        = ::util_dwarf::var_info;
+    using var_list_node_t = std::unique_ptr<var_info>;
+    using var_list_t      = std::vector<var_list_node_t>;
+    var_list_t global_var_tbl;
 
 private:
     std::string dwarf_file_path;
@@ -1209,41 +1209,61 @@ private:
 
         // https://www.prevanders.net/libdwarfdoc/group__examplecuhdre.html
 
-        int result;
-        int depth = 0;
+        bool result = get_child_die(dw_cu_die, [this](Dwarf_Die die) -> bool {
+            analyze_die(die);
+            return true;
+        });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            error_happen(&dw_error);
+        }
+    }
 
-        // childがcompile_unit配下の最初のDIEのはず
-        Dwarf_Die child;
-        result = dwarf_child(dw_cu_die, &child, &dw_error);
-        // childを取得できなかったら終了
+    template <typename Func>
+    bool get_child_die(Dwarf_Die parent, Func &&callback) {
+        int result;
+        // parentから最初のchildを取得する
+        // このchildのsiblingを全部取得することですべてのchildの取得になる
+        Dwarf_Die cur_die;
+        result = dwarf_child(parent, &cur_die, &dw_error);
         if (result == DW_DLV_ERROR) {
+            // エラー発生
             // printf("Error in dwarf_child , depth %d \n", depth);
             //  exit(EXIT_FAILURE);
-            error_happen(&dw_error);
-            return;
+            // error_happen(&dw_error);
+            return false;
+        }
+        if (result == DW_DLV_NO_ENTRY) {
+            // childが存在しない
+            // 正常終了とする
+            return true;
         }
         if (result != DW_DLV_OK) {
-            return;
+            // その他OK以外は異常とする
+            return false;
         }
 
-        Dwarf_Die cur_die = child;
+        // childが存在する限りループしてcallbackを実行する
+        bool func_result = true;
+        bool callback_result;
         Dwarf_Die sib_die = nullptr;
-
-        // compile_unit配下のDIEをすべてチェック
-        // compile_unit直下のDIEを解析にかける
-        // compile_unitのchildを起点にsiblingをすべて取得すればいいはず
         while (cur_die != nullptr) {
-            // 解析
-            analyze_die(cur_die);
+            // コールバック
+            callback_result = callback(cur_die);
+            // falseを返したら終了する
+            if (!callback_result) {
+                break;
+            }
 
             // 次のDIEを検索
             result = dwarf_siblingof_c(cur_die, &sib_die, &dw_error);
             // エラー検出
             if (result == DW_DLV_ERROR) {
-                error_happen(&dw_error);
-                printf("Error in dwarf_siblingof_c , depth %d \n", depth);
-                break;
+                // error_happen(&dw_error);
+                // printf("Error in dwarf_siblingof_c , depth %d \n", depth);
                 // exit(EXIT_FAILURE);
+                func_result = false;
+                break;
             }
             // すべてのDIEをチェック完了
             if (result == DW_DLV_NO_ENTRY) {
@@ -1260,11 +1280,13 @@ private:
             sib_die = nullptr;
         }
 
+        // childを解放して処理終了
         if (cur_die != nullptr) {
-            // 子DIE解放
             dwarf_dealloc(dw_dbg, cur_die, DW_DLA_DIE);
             cur_die = nullptr;
         }
+
+        return func_result;
     }
 
     void analyze_debug_line(Dwarf_Die dw_cu_die) {
@@ -1342,12 +1364,12 @@ private:
             case DW_TAG_compile_unit:
                 // compile_unitはrootノードとして別扱いしている
                 // 上流で解析済み
-                break;
+                return;
 
             // 変数タグ
             case DW_TAG_variable:
                 analyze_DW_TAG_variable(dw_cu_die, die_info);
-                break;
+                return;
             case DW_TAG_constant:
                 // no implement
                 break;
@@ -1446,7 +1468,9 @@ private:
                 break;
         }
 
-        printf("tag: %d\n", tag);
+        const char *name = 0;
+        dwarf_get_TAG_name(die_info.tag, &name);
+        printf("no impl : %s (%u)\n", name, die_info.tag);
     }
 
     // // DW_TAG_*に0がアサインされていないことを前提として、TAG無指定のみ有効化している
@@ -1459,8 +1483,31 @@ private:
 
     void analyze_DW_TAG_variable(Dwarf_Die die, die_info_t &die_info) {
         // 変数情報作成
-        var_info info;
-        analyze_DW_AT<DW_TAG_variable>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        var_list_node_t info = std::make_unique<var_info>();
+        analyze_DW_AT<DW_TAG_variable>(dw_dbg, die, &dw_error, dwarf_info_, *info);
+        // decl_fileチェック
+        if (info->decl_file > 0) {
+            // file_listからこの変数が定義されたファイル名を取得できる
+        }
+        // child dieチェック
+        bool result = get_child_die(die, [this](Dwarf_Die child) -> bool {
+            // analyze_die(child);
+            return true;
+        });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            error_happen(&dw_error);
+        }
+        //
+        if (!info->location or !info->type or info->name.size() == 0) {
+            // いずれかに当てはまるとローカル変数, 定数, etc
+            // アドレスを持たない
+            // typeを持たない
+            // 名前を持たない
+        } else {
+            // アドレスを持っているとグローバル変数
+            global_var_tbl.push_back(std::move(info));
+        }
     }
 };
 
