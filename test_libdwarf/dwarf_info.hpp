@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,6 +17,74 @@
 // https://www.prevanders.net/libdwarfdoc/modules.html
 
 namespace util_dwarf {
+
+// 変数情報
+struct var_info
+{
+    std::string name;
+    bool external;
+    Dwarf_Unsigned decl_file;  // filelistのインデックス
+    bool decl_file_is_external;
+    Dwarf_Unsigned decl_line;
+    Dwarf_Unsigned decl_column;
+    std::optional<Dwarf_Off> type;  // reference
+    std::optional<Dwarf_Off> location;
+    bool declaration;  // 不完全型のときtrue
+    Dwarf_Unsigned const_value;
+    Dwarf_Unsigned sibling;
+};
+
+// 型情報リスト
+class type_info_container {
+public:
+    // 型タグ
+    enum class type_tag : uint16_t
+    {
+        none      = 0x0000,
+        base      = 0x0001,
+        array     = 0x0002,
+        struct_   = 0x0004,
+        union_    = 0x0008,
+        func      = 0x0010,
+        parameter = 0x0020,
+        typedef_  = 0x0040,
+        const_    = 0x0080,
+        volatile_ = 0x0100,
+        pointer   = 0x0200,
+        restrict_ = 0x0400,
+        enum_     = 0x0800,
+
+        func_ptr = func | pointer,
+    };
+
+    struct type_info
+    {
+        uint16_t tag;
+        std::string name;
+        bool external;
+        Dwarf_Unsigned decl_file;  // filelistのインデックス
+        bool decl_file_is_external;
+        Dwarf_Unsigned decl_line;
+        Dwarf_Unsigned decl_column;
+        Dwarf_Unsigned sibling;
+    };
+
+    // 型情報
+    using type_map_t = std::map<Dwarf_Off, type_info>;
+
+    type_map_t type_map;
+
+public:
+    type_info_container() {
+    }
+
+    // type_map操作関数
+    type_info &make_new_type_info(Dwarf_Off offset, type_tag tag) {
+        auto result = type_map.try_emplace(offset, type_info());
+        result.first->second.tag |= (uint16_t)tag;
+        return result.first->second;
+    }
+};
 
 namespace {
 // APIエラーが発生したときにどうするか？
@@ -403,27 +472,6 @@ public:
     }
 };
 
-// 型情報
-struct type_info
-{
-    std::string name;
-};
-// 変数情報
-struct var_info
-{
-    std::string name;
-    bool external;
-    Dwarf_Unsigned decl_file;  // filelistのインデックス
-    bool decl_file_is_external;
-    Dwarf_Unsigned decl_line;
-    Dwarf_Unsigned decl_column;
-    std::optional<Dwarf_Off> type;  // reference
-    std::optional<Dwarf_Off> location;
-    bool declaration;  // 不完全型のときtrue
-    Dwarf_Unsigned const_value;
-    Dwarf_Unsigned sibling;
-};
-
 // compile_unitから取得する情報
 struct compile_unit_info
 {
@@ -711,7 +759,8 @@ void get_DW_AT_location(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
         info.location = *result;
     }
 }
-//
+
+// DW_AT_const_value
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_const_value(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
@@ -721,7 +770,8 @@ void get_DW_AT_const_value(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
         info.const_value = 0;
     }
 }
-// DW_AT_name 実装
+
+// DW_AT_name
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_name(Dwarf_Attribute dw_attr, T &info) {
     char *str         = nullptr;
@@ -845,7 +895,9 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             get_DW_AT_sibling<DW_TAG>(dw_attr, di, info);
             return;
         case DW_AT_location:
-            get_DW_AT_location<DW_TAG>(dw_attr, di, info);
+            if constexpr (std::is_same_v<T, var_info>) {
+                get_DW_AT_location<DW_TAG>(dw_attr, di, info);
+            }
             return;
 
         case DW_AT_name:
@@ -872,7 +924,9 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
         case DW_AT_comp_dir:
             break;
         case DW_AT_const_value:
-            get_DW_AT_const_value<DW_TAG>(dw_attr, di, info);
+            if constexpr (std::is_same_v<T, var_info>) {
+                get_DW_AT_const_value<DW_TAG>(dw_attr, di, info);
+            }
             return;
 
         case DW_AT_containing_type:
@@ -908,7 +962,9 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             return;
 
         case DW_AT_declaration:
-            get_DW_AT_declaration<DW_TAG>(dw_attr, info);
+            if constexpr (std::is_same_v<T, var_info>) {
+                get_DW_AT_declaration<DW_TAG>(dw_attr, info);
+            }
             return;
 
         case DW_AT_discr_list:
@@ -916,7 +972,9 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_external:
-            get_DW_AT_external<DW_TAG>(dw_attr, info);
+            if constexpr (std::is_same_v<T, var_info>) {
+                get_DW_AT_external<DW_TAG>(dw_attr, info);
+            }
             return;
 
         case DW_AT_frame_base:
@@ -931,7 +989,9 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_type:
-            get_DW_AT_type<DW_TAG>(dw_attr, di, info);
+            if constexpr (std::is_same_v<T, var_info>) {
+                get_DW_AT_type<DW_TAG>(dw_attr, di, info);
+            }
             return;
 
         case DW_AT_use_location:
@@ -1073,10 +1133,15 @@ public:
         }
     };
 
+    // 変数情報
+    // ★後でvar_list_tも専用管理クラス化
     using var_info        = ::util_dwarf::var_info;
     using var_list_node_t = std::unique_ptr<var_info>;
     using var_list_t      = std::vector<var_list_node_t>;
     var_list_t global_var_tbl;
+    // 型情報
+    using type_tag = type_info_container::type_tag;
+    type_info_container type_tbl;
 
 private:
     std::string dwarf_file_path;
@@ -1381,6 +1446,7 @@ private:
 
             // 型情報タグ
             case DW_TAG_base_type:
+                analyze_DW_TAG_base_type(dw_cu_die, die_info);
                 break;
             case DW_TAG_unspecified_type:
                 break;
@@ -1508,6 +1574,21 @@ private:
             // アドレスを持っているとグローバル変数
             global_var_tbl.push_back(std::move(info));
         }
+    }
+
+    void analyze_DW_TAG_base_type(Dwarf_Die die, die_info_t &die_info) {
+        int res;
+        // DIE offset取得
+        Dwarf_Off dw_global_offset;
+        Dwarf_Off dw_local_offset;
+        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
+        if (res != DW_DLV_OK) {
+            error_happen(&dw_error);
+        }
+        // 型情報作成
+        auto &type_info = type_tbl.make_new_type_info(dw_global_offset, type_tag::base);
+
+        analyze_DW_AT<DW_TAG_base_type>(dw_dbg, die, &dw_error, dwarf_info_, type_info);
     }
 };
 
