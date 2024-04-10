@@ -61,12 +61,16 @@ public:
     {
         uint16_t tag;
         std::string name;
-        bool external;
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         bool decl_file_is_external;
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         Dwarf_Unsigned sibling;
+
+        Dwarf_Unsigned byte_size;
+        Dwarf_Unsigned bit_offset;
+        Dwarf_Unsigned bit_size;
+        Dwarf_Unsigned binary_scale;
     };
 
     // 型情報
@@ -793,6 +797,36 @@ void get_DW_AT_name(Dwarf_Attribute dw_attr, T &info) {
 //         info.name = str;
 //     }
 // }
+// DW_AT_byte_size
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_byte_size(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.byte_size = *result;
+    } else {
+        info.byte_size = 0;
+    }
+}
+// DW_AT_bit_offset
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_bit_offset(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.bit_offset = *result;
+    } else {
+        info.bit_offset = 0;
+    }
+}
+// DW_AT_bit_size
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_bit_size(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.bit_size = *result;
+    } else {
+        info.bit_size = 0;
+    }
+}
 
 // DW_AT_decl_column
 template <Dwarf_Half DW_TAG, typename T>
@@ -843,6 +877,16 @@ void get_DW_AT_type(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
     if (result) {
         info.type = *result;
+    }
+}
+// DW_AT_binary_scale
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_binary_scale(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.binary_scale = *result;
+    } else {
+        info.binary_scale = 0;
     }
 }
 
@@ -906,9 +950,22 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_ordering:
         case DW_AT_subscr_data:
+            break;
         case DW_AT_byte_size:
+            if constexpr (std::is_same_v<T, type_info_container::type_info>) {
+                get_DW_AT_byte_size<DW_TAG>(dw_attr, di, info);
+            }
+            return;
         case DW_AT_bit_offset:
+            if constexpr (std::is_same_v<T, type_info_container::type_info>) {
+                get_DW_AT_bit_offset<DW_TAG>(dw_attr, di, info);
+            }
+            return;
         case DW_AT_bit_size:
+            if constexpr (std::is_same_v<T, type_info_container::type_info>) {
+                get_DW_AT_bit_size<DW_TAG>(dw_attr, di, info);
+            }
+            return;
         case DW_AT_element_list:
         case DW_AT_stmt_list:
         case DW_AT_low_pc:
@@ -1011,7 +1068,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
         case DW_AT_call_file:
         case DW_AT_call_line:
         case DW_AT_description:
+            break;
         case DW_AT_binary_scale:
+            if constexpr (std::is_same_v<T, type_info_container::type_info>) {
+                get_DW_AT_binary_scale<DW_TAG>(dw_attr, di, info);
+            }
         case DW_AT_decimal_scale:
         case DW_AT_small:
         case DW_AT_decimal_sign:
@@ -1556,8 +1617,11 @@ private:
             // file_listからこの変数が定義されたファイル名を取得できる
         }
         // child dieチェック
-        bool result = get_child_die(die, [this](Dwarf_Die child) -> bool {
+        bool result = get_child_die(die, [this, &die_info](Dwarf_Die child) -> bool {
             // analyze_die(child);
+            const char *name = 0;
+            dwarf_get_TAG_name(die_info.tag, &name);
+            printf("no impl : DW_TAG_variable child : %s (%u)\n", name, die_info.tag);
             return true;
         });
         // 異常が発生していたらfalseが返される
@@ -1587,8 +1651,15 @@ private:
         }
         // 型情報作成
         auto &type_info = type_tbl.make_new_type_info(dw_global_offset, type_tag::base);
-
         analyze_DW_AT<DW_TAG_base_type>(dw_dbg, die, &dw_error, dwarf_info_, type_info);
+        // child dieチェック
+        bool result = get_child_die(die, [this, &die_info](Dwarf_Die child) -> bool {
+            // analyze_die(child);
+            const char *name = 0;
+            dwarf_get_TAG_name(die_info.tag, &name);
+            printf("no impl : DW_TAG_base_type child : %s (%u)\n", name, die_info.tag);
+            return true;
+        });
     }
 };
 
