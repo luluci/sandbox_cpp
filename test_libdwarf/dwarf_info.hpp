@@ -1201,7 +1201,8 @@ public:
     using var_list_t      = std::vector<var_list_node_t>;
     var_list_t global_var_tbl;
     // 型情報
-    using type_tag = type_info_container::type_tag;
+    using type_tag  = type_info_container::type_tag;
+    using type_info = type_info_container::type_info;
     type_info_container type_tbl;
 
 private:
@@ -1617,7 +1618,7 @@ private:
             // file_listからこの変数が定義されたファイル名を取得できる
         }
         // child dieチェック
-        bool result = get_child_die(die, [this, &die_info](Dwarf_Die child) -> bool {
+        bool result = get_child_die(die, [this, &die_info](Dwarf_Die) -> bool {
             // analyze_die(child);
             const char *name = 0;
             dwarf_get_TAG_name(die_info.tag, &name);
@@ -1652,14 +1653,27 @@ private:
         // 型情報作成
         auto &type_info = type_tbl.make_new_type_info(dw_global_offset, type_tag::base);
         analyze_DW_AT<DW_TAG_base_type>(dw_dbg, die, &dw_error, dwarf_info_, type_info);
+        //
         // child dieチェック
-        bool result = get_child_die(die, [this, &die_info](Dwarf_Die child) -> bool {
+        bool result = get_child_die(die, [this, &die_info](Dwarf_Die) -> bool {
             // analyze_die(child);
             const char *name = 0;
             dwarf_get_TAG_name(die_info.tag, &name);
             printf("no impl : DW_TAG_base_type child : %s (%u)\n", name, die_info.tag);
             return true;
         });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            error_happen(&dw_error);
+        }
+    }
+
+    void check_omitted_type_info(type_info &info) {
+        // 省略されたDW_AT_*を手動で補完する
+        // decl_fileが省略された場合、[1]のファイルが該当する
+        if (info.decl_file == 0) {
+            info.decl_file = 1;
+        }
     }
 };
 
