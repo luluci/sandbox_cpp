@@ -82,6 +82,7 @@ public:
         std::optional<Dwarf_Unsigned> count;
         std::optional<Dwarf_Unsigned> upper_bound;
         std::optional<Dwarf_Unsigned> lower_bound;
+        Dwarf_Unsigned address_class;
 
         // memberも単体でtype_mapに登録するのでchild_listは参照用のポインタでいい
         using child_node_t = type_info *;
@@ -934,6 +935,17 @@ void get_DW_AT_count(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
     }
 }
 
+// DW_AT_address_class
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_address_class(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+    if (result) {
+        info.address_class = *result;
+    } else {
+        info.address_class = 0;
+    }
+}
+
 // DW_AT_decl_column
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_decl_column(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
@@ -1128,6 +1140,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             return;
 
         case DW_AT_address_class:
+            if constexpr (std::is_same_v<T, type_info_container::type_info>) {
+                get_DW_AT_address_class<DW_TAG>(dw_attr, di, info);
+            }
+            return;
+
         case DW_AT_artificial:
         case DW_AT_base_types:
         case DW_AT_calling_convention:
@@ -1296,7 +1313,11 @@ void analyze_DW_AT(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Error *dw_error, dwarf_
     int errv;
 
     errv = dwarf_attrlist(die, &atlist, &atcount, dw_error);
-    if (errv != DW_DLV_OK) {
+    if (errv == DW_DLV_NO_ENTRY) {
+        // DW_AT_* なし
+        return;
+    }
+    if (errv == DW_DLV_ERROR) {
         // return errv;
         error_happen(dw_error);
         return;
@@ -1393,8 +1414,13 @@ public:
         auto result = dwarf_init_path(dwarf_file_path.c_str(), dw_true_path_buff, dw_true_path_buff_len, dw_groupnumber, err_handler, dw_errarg,
                                       &dw_dbg, &dw_error);
         printf("dwarf_init_path : result : %d\n", result);
-        if (result != DW_DLV_OK) {
-            printf("dwarf_init_path : failed.\n");
+        if (result == DW_DLV_NO_ENTRY) {
+            // 情報なし？
+            return false;
+        }
+        if (result == DW_DLV_ERROR) {
+            // return errv;
+            error_happen(&dw_error);
             return false;
         }
 
@@ -1515,10 +1541,6 @@ private:
             // 正常終了とする
             return true;
         }
-        if (result != DW_DLV_OK) {
-            // その他OK以外は異常とする
-            return false;
-        }
 
         // childが存在する限りループしてcallbackを実行する
         bool func_result = true;
@@ -1583,20 +1605,23 @@ private:
 
         // 情報取得
         res = dwarf_srclines_b(dw_cu_die, &lineversion, &table_count, &line_context, &dw_error);
-        if (res != DW_DLV_OK) {
+        if (res == DW_DLV_ERROR) {
             /*  dwarf_finish() will dealloc srcfiles, not doing
                 that here.  */
             // return res;
             error_happen(&dw_error);
             return;
         }
+        // DW_DLV_OK, DW_DLV_NO_ENTRYなら次へ
+
         res = dwarf_srcfiles(dw_cu_die, &srcfiles, &count, &dw_error);
-        if (res != DW_DLV_OK) {
+        if (res == DW_DLV_ERROR) {
+            // return res;
             error_happen(&dw_error);
             dwarf_srclines_dealloc_b(line_context);
-            // return res;
             return;
         }
+        // DW_DLV_OK, DW_DLV_NO_ENTRYなら次へ
 
         // 暫定：値取り出し
         for (i = 0; i < count; ++i) {
@@ -1687,15 +1712,20 @@ private:
                 break;
             case DW_TAG_formal_parameter:
                 break;
+
             // type-qualifier
             case DW_TAG_const_type:
-                break;
+                analyze_DW_TAG_type_qualifier<DW_TAG_const_type>(die, die_info, type_tag::const_);
+                return;
             case DW_TAG_pointer_type:
-                break;
+                analyze_DW_TAG_type_qualifier<DW_TAG_pointer_type>(die, die_info, type_tag::pointer);
+                return;
             case DW_TAG_restrict_type:
-                break;
+                analyze_DW_TAG_type_qualifier<DW_TAG_restrict_type>(die, die_info, type_tag::restrict_);
+                return;
             case DW_TAG_volatile_type:
-                break;
+                analyze_DW_TAG_type_qualifier<DW_TAG_volatile_type>(die, die_info, type_tag::volatile_);
+                return;
 
             default:
                 // case DW_TAG_inlined_subroutine:
@@ -1856,7 +1886,7 @@ private:
             error_happen(&dw_error);
         }
     }
-    template <size_t DW_TAG>
+    template <Dwarf_Half DW_TAG>
     void analyze_DW_TAG_struct_union_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
         int result;
         Dwarf_Half tag;
@@ -1876,25 +1906,26 @@ private:
                 return;
             }
 
-            case DW_TAG_array_type: {
-                // struct/union/class内で使う型情報の定義
-                // member要素にはならない
-                // 解析して型情報として登録する
+            // struct/union/class内で使う型情報の定義
+            // member要素にはならない
+            // 解析して型情報として登録する
+            case DW_TAG_array_type:
                 analyze_DW_TAG_array_type(die, die_info);
                 return;
-            }
 
             // type-qualifier
             case DW_TAG_const_type:
-            case DW_TAG_pointer_type:
-            case DW_TAG_restrict_type:
-            case DW_TAG_volatile_type: {
-                // struct/union/class内で使う型情報の定義
-                // member要素にはならない
-                // 解析して型情報として登録する
-                // analyze_DW_TAG_TAG_type_qualifier(die, die_info);
+                analyze_DW_TAG_type_qualifier<DW_TAG_const_type>(die, die_info, type_tag::const_);
                 return;
-            }
+            case DW_TAG_pointer_type:
+                analyze_DW_TAG_type_qualifier<DW_TAG_pointer_type>(die, die_info, type_tag::pointer);
+                return;
+            case DW_TAG_restrict_type:
+                analyze_DW_TAG_type_qualifier<DW_TAG_restrict_type>(die, die_info, type_tag::restrict_);
+                return;
+            case DW_TAG_volatile_type:
+                analyze_DW_TAG_type_qualifier<DW_TAG_volatile_type>(die, die_info, type_tag::volatile_);
+                return;
 
             // 関数タグ
             case DW_TAG_subprogram:
@@ -2028,6 +2059,25 @@ private:
         debug_dump_no_impl_child(die, "DW_TAG_subrange_type");
         //
         return &info;
+    }
+
+    // DW_TAG_TAG_type_qualifier
+    template <Dwarf_Half DW_TAG>
+    void analyze_DW_TAG_type_qualifier(Dwarf_Die die, die_info_t &die_info, type_tag tag) {
+        int res;
+        // DIE offset取得
+        Dwarf_Off dw_global_offset;
+        Dwarf_Off dw_local_offset;
+        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
+        if (res != DW_DLV_OK) {
+            error_happen(&dw_error);
+        }
+        // 型情報作成
+        auto &info = type_tbl.make_new_type_info(dw_global_offset, tag);
+        analyze_DW_AT<DW_TAG>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        // child dieチェックしない
+        // childが存在したら表示だけ出しておく
+        debug_dump_no_impl_child(die, "DW_TAG_const/pointer/restrict/volatile_type");
     }
 
     void check_omitted_type_info(type_info &info) {
