@@ -40,63 +40,64 @@ struct dwarf_info
         Dwarf_Unsigned endianity;  // DW_END_*
     };
 
+    // 型タグ
+    enum class type_tag : uint16_t
+    {
+        none      = 0x0000,
+        base      = 0x0001,
+        array     = 0x0002,
+        struct_   = 0x0004,
+        union_    = 0x0008,
+        func      = 0x0010,
+        parameter = 0x0020,
+        typedef_  = 0x0040,
+        const_    = 0x0080,
+        volatile_ = 0x0100,
+        pointer   = 0x0200,
+        restrict_ = 0x0400,
+        enum_     = 0x0800,
+        reference = 0x1000,
+        member    = 0x2000,  // struct,union,classのメンバ
+
+        func_ptr = func | pointer,
+    };
+
+    struct type_info
+    {
+        uint16_t tag;
+        std::string name;
+        Dwarf_Unsigned decl_file;  // filelistのインデックス
+        bool decl_file_is_external;
+        Dwarf_Unsigned decl_line;
+        Dwarf_Unsigned decl_column;
+        Dwarf_Unsigned sibling;
+        bool declaration;               // 不完全型のときtrue
+        std::optional<Dwarf_Off> type;  // reference
+
+        Dwarf_Unsigned byte_size;
+        Dwarf_Unsigned bit_offset;
+        Dwarf_Unsigned bit_size;
+        Dwarf_Unsigned data_bit_offset;
+        Dwarf_Off data_member_location;
+        Dwarf_Unsigned binary_scale;
+        Dwarf_Unsigned signature;
+        Dwarf_Unsigned accessibility;
+        std::optional<Dwarf_Unsigned> count;
+        std::optional<Dwarf_Unsigned> upper_bound;
+        std::optional<Dwarf_Unsigned> lower_bound;
+        std::optional<Dwarf_Unsigned> address_class;
+        Dwarf_Unsigned encoding;   // DW_ATE_*
+        Dwarf_Unsigned endianity;  // DW_END_*
+
+        // memberも単体でtype_mapに登録するのでchild_listは参照用のポインタでいい
+        using child_node_t = type_info *;
+        using child_list_t = std::list<child_node_t>;
+        child_list_t child_list;
+    };
+
     // 型情報リスト
     class type_info_container {
     public:
-        // 型タグ
-        enum class type_tag : uint16_t
-        {
-            none      = 0x0000,
-            base      = 0x0001,
-            array     = 0x0002,
-            struct_   = 0x0004,
-            union_    = 0x0008,
-            func      = 0x0010,
-            parameter = 0x0020,
-            typedef_  = 0x0040,
-            const_    = 0x0080,
-            volatile_ = 0x0100,
-            pointer   = 0x0200,
-            restrict_ = 0x0400,
-            enum_     = 0x0800,
-            member    = 0x1000,  // struct,union,classのメンバ
-
-            func_ptr = func | pointer,
-        };
-
-        struct type_info
-        {
-            uint16_t tag;
-            std::string name;
-            Dwarf_Unsigned decl_file;  // filelistのインデックス
-            bool decl_file_is_external;
-            Dwarf_Unsigned decl_line;
-            Dwarf_Unsigned decl_column;
-            Dwarf_Unsigned sibling;
-            bool declaration;               // 不完全型のときtrue
-            std::optional<Dwarf_Off> type;  // reference
-
-            Dwarf_Unsigned byte_size;
-            Dwarf_Unsigned bit_offset;
-            Dwarf_Unsigned bit_size;
-            Dwarf_Unsigned data_bit_offset;
-            Dwarf_Off data_member_location;
-            Dwarf_Unsigned binary_scale;
-            Dwarf_Unsigned signature;
-            Dwarf_Unsigned accessibility;
-            std::optional<Dwarf_Unsigned> count;
-            std::optional<Dwarf_Unsigned> upper_bound;
-            std::optional<Dwarf_Unsigned> lower_bound;
-            std::optional<Dwarf_Unsigned> address_class;
-            Dwarf_Unsigned encoding;   // DW_ATE_*
-            Dwarf_Unsigned endianity;  // DW_END_*
-
-            // memberも単体でtype_mapに登録するのでchild_listは参照用のポインタでいい
-            using child_node_t = type_info *;
-            using child_list_t = std::list<child_node_t>;
-            child_list_t child_list;
-        };
-
         // 型情報
         using type_map_t = std::map<Dwarf_Off, type_info>;
 

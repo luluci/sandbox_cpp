@@ -315,17 +315,17 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
         case DW_AT_subscr_data:
             break;
         case DW_AT_byte_size:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_byte_size<DW_TAG>(dw_attr, di, info);
             }
             return;
         case DW_AT_bit_offset:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_bit_offset<DW_TAG>(dw_attr, di, info);
             }
             return;
         case DW_AT_bit_size:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_bit_size<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -356,7 +356,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_lower_bound:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_lower_bound<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -370,7 +370,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_upper_bound:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_upper_bound<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -379,13 +379,13 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_accessibility:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_accessibility<DW_TAG>(dw_attr, di, info);
             }
             return;
 
         case DW_AT_address_class:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_address_class<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -396,13 +396,13 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_count:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_count<DW_TAG>(dw_attr, di, info);
             }
             return;
 
         case DW_AT_data_member_location:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_data_member_location<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -425,7 +425,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_encoding:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_encoding<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -471,7 +471,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_binary_scale:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_binary_scale<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -497,7 +497,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_signature:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_signature<DW_TAG>(dw_attr, di, info);
             }
             return;
@@ -505,7 +505,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_data_bit_offset:
-            if constexpr (std::is_same_v<T, dwarf_info::type_info_container::type_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
                 get_DW_AT_data_bit_offset<DW_TAG>(dw_attr, di, info);
             }
             return;

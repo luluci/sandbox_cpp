@@ -38,9 +38,9 @@ public:
     using var_list_t      = dwarf_info::var_list_t;
 
     // 型情報
-    using type_tag   = dwarf_info::type_info_container::type_tag;
-    using type_info  = dwarf_info::type_info_container::type_info;
-    using type_child = dwarf_info::type_info_container::type_info::child_node_t;
+    using type_tag   = dwarf_info::type_tag;
+    using type_info  = dwarf_info::type_info;
+    using type_child = dwarf_info::type_info::child_node_t;
 
 private:
     std::string dwarf_file_path;
@@ -373,12 +373,8 @@ private:
                     return;
                 }
             case DW_TAG_subroutine_type:
-                if (analyze_func_info_) {
-                    // no implement
-                    break;
-                } else {
-                    return;
-                }
+                analyze_DW_TAG_subroutine_type(die, die_info);
+                return;
             case DW_TAG_formal_parameter:
                 // おそらくここには出現しない
                 break;
@@ -405,6 +401,10 @@ private:
             case DW_TAG_subrange_type:
                 // おそらくここには出現しない
                 break;
+
+            case DW_TAG_reference_type:
+                analyze_DW_TAG_reference_type(die, die_info);
+                return;
 
             case DW_TAG_structure_type:
             case DW_TAG_class_type:
@@ -439,7 +439,6 @@ private:
                 // case DW_TAG_entry_point:
                 // case DW_TAG_imported_declaration:
                 // case DW_TAG_lexical_block:
-                // case DW_TAG_reference_type:
                 // case DW_TAG_compile_unit:
                 // case DW_TAG_string_type:
                 // case DW_TAG_unspecified_parameters:
@@ -555,9 +554,61 @@ private:
         // 型情報作成
         auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::enum_);
         analyze_DW_AT<DW_TAG_enumeration_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        // child dieチェック
+        bool result = get_child_die(die, [this, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_enumeration_type_child(child, die_info, info);
+            return true;
+        });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            utility::error_happen(&dw_error);
+        }
+    }
+    void analyze_DW_TAG_enumeration_type_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
+        int result;
+        Dwarf_Half tag;
+        result = dwarf_tag(die, &tag, &dw_error);
+        if (result != DW_DLV_OK) {
+            utility::error_happen(&dw_error);
+        }
+
+        // DW_TAG_subroutine_typeのchildとして出現するDW_TAG_*を処理する
+        auto die_info = die_info_t(tag);
+        switch (die_info.tag) {
+            case DW_TAG_enumerator: {
+                // member情報を作成
+                auto mem_info = analyze_DW_TAG_enumerator(die, die_info);
+                // parentのchildにparameterとして登録
+                parent_type.child_list.push_back(std::move(mem_info));
+                return;
+            }
+
+            default:
+                break;
+        }
+
+        const char *name = 0;
+        dwarf_get_TAG_name(die_info.tag, &name);
+        printf("no impl : DW_TAG_enumeration_type child : %s (%u)\n", name, die_info.tag);
+    }
+    // DW_TAG_enumerator
+    type_child analyze_DW_TAG_enumerator(Dwarf_Die die, die_info_t &die_info) {
+        int res;
+        // DIE offset取得
+        Dwarf_Off dw_global_offset;
+        Dwarf_Off dw_local_offset;
+        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
+        if (res != DW_DLV_OK) {
+            utility::error_happen(&dw_error);
+        }
+        // 型情報作成
+        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::enum_);
+        analyze_DW_AT<DW_TAG_enumerator>(dw_dbg, die, &dw_error, dwarf_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
-        debug_dump_no_impl_child(die, "DW_TAG_enumeration_type");
+        debug_dump_no_impl_child(die, "DW_TAG_enumerator");
+        //
+        return &info;
     }
 
     void analyze_DW_TAG_structure_type(Dwarf_Die die, die_info_t &die_info) {
@@ -617,6 +668,10 @@ private:
             // 解析して型情報として登録する
             case DW_TAG_array_type:
                 analyze_DW_TAG_array_type(die, die_info);
+                return;
+
+            case DW_TAG_reference_type:
+                analyze_DW_TAG_reference_type(die, die_info);
                 return;
 
             // type-qualifier
@@ -769,6 +824,94 @@ private:
         debug_dump_no_impl_child(die, "DW_TAG_subrange_type");
         //
         return &info;
+    }
+
+    // DW_TAG_subroutine_type
+    void analyze_DW_TAG_subroutine_type(Dwarf_Die die, die_info_t &die_info) {
+        int res;
+        // DIE offset取得
+        Dwarf_Off dw_global_offset;
+        Dwarf_Off dw_local_offset;
+        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
+        if (res != DW_DLV_OK) {
+            utility::error_happen(&dw_error);
+        }
+        // 型情報作成
+        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::func);
+        analyze_DW_AT<DW_TAG_subroutine_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        // child dieチェック
+        bool result = get_child_die(die, [this, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_subroutine_type_child(child, die_info, info);
+            return true;
+        });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            utility::error_happen(&dw_error);
+        }
+    }
+    void analyze_DW_TAG_subroutine_type_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
+        int result;
+        Dwarf_Half tag;
+        result = dwarf_tag(die, &tag, &dw_error);
+        if (result != DW_DLV_OK) {
+            utility::error_happen(&dw_error);
+        }
+
+        // DW_TAG_subroutine_typeのchildとして出現するDW_TAG_*を処理する
+        auto die_info = die_info_t(tag);
+        switch (die_info.tag) {
+            case DW_TAG_formal_parameter: {
+                // member情報を作成
+                auto mem_info = analyze_DW_TAG_formal_parameter(die, die_info);
+                // parentのchildにparameterとして登録
+                parent_type.child_list.push_back(std::move(mem_info));
+                return;
+            }
+
+            default:
+                break;
+        }
+
+        const char *name = 0;
+        dwarf_get_TAG_name(die_info.tag, &name);
+        printf("no impl : DW_TAG_subroutine_type child : %s (%u)\n", name, die_info.tag);
+    }
+    // DW_TAG_formal_parameter
+    type_child analyze_DW_TAG_formal_parameter(Dwarf_Die die, die_info_t &die_info) {
+        int res;
+        // DIE offset取得
+        Dwarf_Off dw_global_offset;
+        Dwarf_Off dw_local_offset;
+        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
+        if (res != DW_DLV_OK) {
+            utility::error_happen(&dw_error);
+        }
+        // 型情報作成
+        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::parameter);
+        analyze_DW_AT<DW_TAG_formal_parameter>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        // child dieチェックしない
+        // childが存在したら表示だけ出しておく
+        debug_dump_no_impl_child(die, "DW_TAG_formal_parameter");
+        //
+        return &info;
+    }
+
+    // DW_TAG_reference_type
+    void analyze_DW_TAG_reference_type(Dwarf_Die die, die_info_t &die_info) {
+        int res;
+        // DIE offset取得
+        Dwarf_Off dw_global_offset;
+        Dwarf_Off dw_local_offset;
+        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
+        if (res != DW_DLV_OK) {
+            utility::error_happen(&dw_error);
+        }
+        // 型情報作成
+        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::reference);
+        analyze_DW_AT<DW_TAG_reference_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        // child dieチェックしない
+        // childが存在したら表示だけ出しておく
+        debug_dump_no_impl_child(die, "DW_TAG_reference_type");
     }
 
     // DW_TAG_TAG_type_qualifier
