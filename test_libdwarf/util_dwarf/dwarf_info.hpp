@@ -40,6 +40,28 @@ struct dwarf_info
         Dwarf_Unsigned endianity;  // DW_END_*
     };
 
+    // 変数情報リスト
+    class var_info_container {
+    public:
+        // type def
+        using var_list_node_t = std::unique_ptr<var_info>;
+        using var_list_t      = std::vector<var_list_node_t>;
+
+        var_list_t var_list;
+
+    public:
+        var_info_container() {
+        }
+
+        // var_list操作関数
+        var_list_node_t make_new_var_info() {
+            return std::make_unique<var_info>();
+        }
+        void add(var_list_node_t &&node) {
+            var_list.push_back(std::move(node));
+        }
+    };
+
     // 型タグ
     enum class type_tag : uint16_t
     {
@@ -147,11 +169,6 @@ struct dwarf_info
         }
     };
 
-    // 変数情報
-    // ★後でvar_list_tも専用管理クラス化
-    using var_list_node_t = std::unique_ptr<var_info>;
-    using var_list_t      = std::vector<var_list_node_t>;
-
     // libdwarf APIデータ
     Dwarf_Debug *dw_dbg;
 
@@ -161,7 +178,7 @@ struct dwarf_info
 
     // DIE解析情報
     compile_unit_info cu_info;
-    var_list_t global_var_tbl;
+    var_info_container global_var_tbl;
     type_info_container type_tbl;
 
     // DWARF expression 制御クラス

@@ -32,10 +32,7 @@ public:
     };
 
     // 変数情報
-    // ★後でvar_list_tも専用管理クラス化
-    using var_info        = dwarf_info::var_info;
-    using var_list_node_t = dwarf_info::var_list_node_t;
-    using var_list_t      = dwarf_info::var_list_t;
+    using var_info = dwarf_info::var_info;
 
     // 型情報
     using type_tag   = dwarf_info::type_tag;
@@ -501,7 +498,7 @@ private:
 
     void analyze_DW_TAG_variable(Dwarf_Die die, die_info_t &die_info) {
         // 変数情報作成
-        var_list_node_t info = std::make_unique<var_info>();
+        auto info = dwarf_info_.global_var_tbl.make_new_var_info();
         analyze_DW_AT<DW_TAG_variable>(dw_dbg, die, &dw_error, dwarf_info_, *info);
         // decl_fileチェック
         if (info->decl_file > 0) {
@@ -518,7 +515,7 @@ private:
             // 名前を持たない
         } else {
             // アドレスを持っているとグローバル変数
-            dwarf_info_.global_var_tbl.push_back(std::move(info));
+            dwarf_info_.global_var_tbl.add(std::move(info));
         }
     }
 
