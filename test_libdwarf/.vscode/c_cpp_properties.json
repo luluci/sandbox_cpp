@@ -3,7 +3,9 @@
         {
             "name": "Win32_msys2_mingw64",
             "includePath": [
-                "D:/msys64/usr/local/libdwarf_092/include"
+                "D:/msys64/usr/local/libdwarf_092/include",
+                "D:/msys64/mingw64/include/c++/13.2.0",
+                "D:/msys64/mingw64/include/c++/13.2.0/x86_64-w64-mingw32"
             ],
             "compilerPath": "D:/msys64/mingw64/bin/g++.exe",
             "cStandard": "c17",

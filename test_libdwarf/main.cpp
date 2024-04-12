@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-#include "dwarf_info.hpp"
+#include "util_dwarf/dwarf_analyzer.hpp"
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
@@ -13,6 +13,7 @@ int main(int argc, char *argv[]) {
     }
 
     util_dwarf::dwarf_analyzer di;
+    di.set_analyze_func_info(false);
     auto result = di.open(argv[1]);
     if (result) {
         clock_t s, t;
