@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "dwarf_analyze_info.hpp"
 #include "dwarf_attribute.hpp"
 #include "dwarf_info.hpp"
 #include "elf.hpp"
@@ -44,17 +45,19 @@ private:
     static constexpr size_t dw_true_path_buff_len = 512;
     char dw_true_path_buff[dw_true_path_buff_len];
 
-    Dwarf_Debug dw_dbg;
-    Dwarf_Error dw_error;
-
-    static void err_handler(Dwarf_Error dw_error, Dwarf_Ptr dw_errarg) {
+    static void err_handler(Dwarf_Error error, Dwarf_Ptr dw_errarg) {
+        char *errmsg = dwarf_errmsg(error);
+        printf("%s\n", errmsg);
+        throw std::runtime_error("libdwarf API error!");
+        exit(1);  // 一応書いておく
     }
 
     // 解析制御情報
     bool analyze_func_info_;
     // 解析ワーク情報
-    // 解析中compile_unit情報
-    dwarf_info dwarf_info_;
+    Dwarf_Debug dw_dbg;
+    Dwarf_Error dw_error;
+    dwarf_analyze_info analyze_info_;
 
     // 解析情報
 
@@ -93,28 +96,30 @@ public:
             return false;
         }
 
-        // アーキテクチャ情報取得
-        analyze_machine_architecture();
-
-        //
-        dwarf_info_.dw_dbg = &dw_dbg;
-
         return true;
     }
 
-    void analyze() {
+    void analyze(dwarf_info &info) {
         Dwarf_Bool dw_is_info = true;
         Dwarf_Die dw_cu_die;
 
         int result;
         bool finish = false;
 
+        // 解析情報初期化
+        analyze_info_          = dwarf_analyze_info();
+        analyze_info_.dw_dbg   = dw_dbg;
+        analyze_info_.dw_error = dw_error;
+
+        // アーキテクチャ情報取得
+        analyze_machine_architecture(info);
+
         while (!finish) {
             // compile_unit取得
             // ヘッダ情報が一緒に返される
-            // ★cu_infoは使い捨てている。必要に応じて保持する
-            dwarf_info_.cu_info = dwarf_info::compile_unit_info();
-            auto &cu_info       = dwarf_info_.cu_info;
+            // ★cu_infoは使い捨てている。必要に応じてinfo.cu_infoに保持する
+            analyze_info_.cu_info = dwarf_info::compile_unit_info();
+            auto &cu_info         = analyze_info_.cu_info;
             result = dwarf_next_cu_header_e(dw_dbg, dw_is_info, &dw_cu_die, &cu_info.cu_header_length, &cu_info.version_stamp, &cu_info.abbrev_offset,
                                             &cu_info.address_size, &cu_info.length_size, &cu_info.extension_size, &cu_info.type_signature,
                                             &cu_info.typeoffset, &cu_info.next_cu_header_offset, &cu_info.header_cu_type, &dw_error);
@@ -154,7 +159,7 @@ public:
                 utility::error_happen(&dw_error);
             }
             if (tag == DW_TAG_compile_unit) {
-                analyze_cu(dw_cu_die);
+                analyze_cu(dw_cu_die, info);
             }
 
             dwarf_dealloc_die(dw_cu_die);
@@ -170,26 +175,26 @@ public:
 
         auto result = dwarf_finish(dw_dbg);
         printf("dwarf_finish : result : %d\n", result);
+        dw_dbg = nullptr;
         return (result == DW_DLV_OK);
     }
 
 private:
-    void analyze_machine_architecture() {
-        auto result = dwarf_machine_architecture(dw_dbg, &dwarf_info_.machine_arch.ftype, &dwarf_info_.machine_arch.obj_pointersize,
-                                                 &dwarf_info_.machine_arch.obj_is_big_endian, &dwarf_info_.machine_arch.obj_machine,
-                                                 &dwarf_info_.machine_arch.obj_flags, &dwarf_info_.machine_arch.path_source,
-                                                 &dwarf_info_.machine_arch.ub_offset, &dwarf_info_.machine_arch.ub_count,
-                                                 &dwarf_info_.machine_arch.ub_index, &dwarf_info_.machine_arch.comdat_groupnumber);
+    void analyze_machine_architecture(dwarf_info &info) {
+        auto result = dwarf_machine_architecture(dw_dbg, &info.machine_arch.ftype, &info.machine_arch.obj_pointersize,
+                                                 &info.machine_arch.obj_is_big_endian, &info.machine_arch.obj_machine, &info.machine_arch.obj_flags,
+                                                 &info.machine_arch.path_source, &info.machine_arch.ub_offset, &info.machine_arch.ub_count,
+                                                 &info.machine_arch.ub_index, &info.machine_arch.comdat_groupnumber);
         if (result == DW_DLV_NO_ENTRY) {
             return;
         }
         // アーキテクチャ情報選択
-        dwarf_info_.arch_info = &(arch::arch_info_tbl[dwarf_info_.machine_arch.obj_machine]);
+        info.arch_info = &(arch::arch_info_tbl[info.machine_arch.obj_machine]);
     }
 
-    void analyze_cu(Dwarf_Die dw_cu_die) {
+    void analyze_cu(Dwarf_Die dw_cu_die, dwarf_info &info) {
         // 先にcompile_unitの情報を取得
-        analyze_die_TAG_compile_unit(dw_cu_die);
+        analyze_die_TAG_compile_unit(dw_cu_die, info);
 
         // .debug_line解析
         // 必要になったら実装
@@ -197,8 +202,8 @@ private:
 
         // https://www.prevanders.net/libdwarfdoc/group__examplecuhdre.html
 
-        bool result = get_child_die(dw_cu_die, [this](Dwarf_Die die) -> bool {
-            analyze_die(die);
+        bool result = get_child_die(dw_cu_die, [this, &info](Dwarf_Die die) -> bool {
+            analyze_die(die, info);
             return true;
         });
         // 異常が発生していたらfalseが返される
@@ -334,7 +339,7 @@ private:
         return;
     }
 
-    void analyze_die(Dwarf_Die die) {
+    void analyze_die(Dwarf_Die die, dwarf_info &info) {
         // DIEを解析して情報取得する
         // ★die_infoは使い捨てにしている。必要に応じて保持するように変更する
         // die_infoを構築したらTAGに応じて変数情報、型情報に変換して記憶する
@@ -355,7 +360,7 @@ private:
 
             // 変数タグ
             case DW_TAG_variable:
-                analyze_DW_TAG_variable(die, die_info);
+                analyze_DW_TAG_variable(die, info, die_info);
                 return;
             case DW_TAG_constant:
                 // no implement
@@ -370,7 +375,7 @@ private:
                     return;
                 }
             case DW_TAG_subroutine_type:
-                analyze_DW_TAG_subroutine_type(die, die_info);
+                analyze_DW_TAG_subroutine_type(die, info, die_info);
                 return;
             case DW_TAG_formal_parameter:
                 // おそらくここには出現しない
@@ -385,13 +390,13 @@ private:
 
             // 型情報タグ
             case DW_TAG_base_type:
-                analyze_DW_TAG_base_type(die, die_info);
+                analyze_DW_TAG_base_type(die, info, die_info);
                 return;
             case DW_TAG_unspecified_type:
                 // analyze_DW_TAG_unspecified_type(die, die_info);
                 break;
             case DW_TAG_enumeration_type:
-                analyze_DW_TAG_enumeration_type(die, die_info);
+                analyze_DW_TAG_enumeration_type(die, info, die_info);
                 return;
             case DW_TAG_enumerator:
             case DW_TAG_member:
@@ -400,35 +405,35 @@ private:
                 break;
 
             case DW_TAG_reference_type:
-                analyze_DW_TAG_reference_type(die, die_info);
+                analyze_DW_TAG_reference_type(die, info, die_info);
                 return;
 
             case DW_TAG_structure_type:
             case DW_TAG_class_type:
-                analyze_DW_TAG_structure_type(die, die_info);
+                analyze_DW_TAG_structure_type(die, info, die_info);
                 return;
             case DW_TAG_union_type:
-                analyze_DW_TAG_union_type(die, die_info);
+                analyze_DW_TAG_union_type(die, info, die_info);
                 return;
             case DW_TAG_typedef:
-                analyze_DW_TAG_typedef(die, die_info);
+                analyze_DW_TAG_typedef(die, info, die_info);
                 return;
             case DW_TAG_array_type:
-                analyze_DW_TAG_array_type(die, die_info);
+                analyze_DW_TAG_array_type(die, info, die_info);
                 return;
 
             // type-qualifier
             case DW_TAG_const_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_const_type>(die, die_info, type_tag::const_);
+                analyze_DW_TAG_type_qualifier<DW_TAG_const_type>(die, info, die_info, type_tag::const_);
                 return;
             case DW_TAG_pointer_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_pointer_type>(die, die_info, type_tag::pointer);
+                analyze_DW_TAG_type_qualifier<DW_TAG_pointer_type>(die, info, die_info, type_tag::pointer);
                 return;
             case DW_TAG_restrict_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_restrict_type>(die, die_info, type_tag::restrict_);
+                analyze_DW_TAG_type_qualifier<DW_TAG_restrict_type>(die, info, die_info, type_tag::restrict_);
                 return;
             case DW_TAG_volatile_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_volatile_type>(die, die_info, type_tag::volatile_);
+                analyze_DW_TAG_type_qualifier<DW_TAG_volatile_type>(die, info, die_info, type_tag::volatile_);
                 return;
 
             default:
@@ -493,13 +498,13 @@ private:
     // auto analyze_DW_TAG(Dwarf_Die die, die_info_t &die_info) -> std::enable_if_t<Tag == 0> {
     // }
 
-    void analyze_die_TAG_compile_unit(Dwarf_Die dw_cu_die) {
+    void analyze_die_TAG_compile_unit(Dwarf_Die, dwarf_info &) {
     }
 
-    void analyze_DW_TAG_variable(Dwarf_Die die, die_info_t &die_info) {
+    void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // 変数情報作成
-        auto info = dwarf_info_.global_var_tbl.make_new_var_info();
-        analyze_DW_AT<DW_TAG_variable>(dw_dbg, die, &dw_error, dwarf_info_, *info);
+        auto info = dw_info.global_var_tbl.make_new_var_info();
+        analyze_DW_AT<DW_TAG_variable>(die, analyze_info_, *info);
         // decl_fileチェック
         if (info->decl_file > 0) {
             // file_listからこの変数が定義されたファイル名を取得できる
@@ -515,22 +520,16 @@ private:
             // 名前を持たない
         } else {
             // アドレスを持っているとグローバル変数
-            dwarf_info_.global_var_tbl.add(std::move(info));
+            dw_info.global_var_tbl.add(std::move(info));
         }
     }
 
-    void analyze_DW_TAG_base_type(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    void analyze_DW_TAG_base_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::base);
-        analyze_DW_AT<DW_TAG_base_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::base);
+        analyze_DW_AT<DW_TAG_base_type>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_base_type");
@@ -539,21 +538,15 @@ private:
     // void analyze_DW_TAG_unspecified_type(Dwarf_Die die, die_info_t &die_info) {
     // }
 
-    void analyze_DW_TAG_enumeration_type(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    void analyze_DW_TAG_enumeration_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::enum_);
-        analyze_DW_AT<DW_TAG_enumeration_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::enum_);
+        analyze_DW_AT<DW_TAG_enumeration_type>(die, analyze_info_, info);
         // child dieチェック
-        bool result = get_child_die(die, [this, &die_info, &info](Dwarf_Die child) -> bool {
-            analyze_DW_TAG_enumeration_type_child(child, die_info, info);
+        bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_enumeration_type_child(child, dw_info, die_info, info);
             return true;
         });
         // 異常が発生していたらfalseが返される
@@ -561,7 +554,7 @@ private:
             utility::error_happen(&dw_error);
         }
     }
-    void analyze_DW_TAG_enumeration_type_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
+    void analyze_DW_TAG_enumeration_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_info &parent_type) {
         int result;
         Dwarf_Half tag;
         result = dwarf_tag(die, &tag, &dw_error);
@@ -574,7 +567,7 @@ private:
         switch (die_info.tag) {
             case DW_TAG_enumerator: {
                 // member情報を作成
-                auto mem_info = analyze_DW_TAG_enumerator(die, die_info);
+                auto mem_info = analyze_DW_TAG_enumerator(die, dw_info, die_info);
                 // parentのchildにparameterとして登録
                 parent_type.child_list.push_back(std::move(mem_info));
                 return;
@@ -589,18 +582,12 @@ private:
         printf("no impl : DW_TAG_enumeration_type child : %s (%u)\n", name, die_info.tag);
     }
     // DW_TAG_enumerator
-    type_child analyze_DW_TAG_enumerator(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    type_child analyze_DW_TAG_enumerator(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::enum_);
-        analyze_DW_AT<DW_TAG_enumerator>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::enum_);
+        analyze_DW_AT<DW_TAG_enumerator>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_enumerator");
@@ -608,31 +595,25 @@ private:
         return &info;
     }
 
-    void analyze_DW_TAG_structure_type(Dwarf_Die die, die_info_t &die_info) {
+    void analyze_DW_TAG_structure_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // structとunionがほぼ同じなので共通処理にする
-        analyze_DW_TAG_struct_union<DW_TAG_structure_type>(die, die_info, type_tag::struct_);
+        analyze_DW_TAG_struct_union<DW_TAG_structure_type>(die, dw_info, die_info, type_tag::struct_);
     }
-    void analyze_DW_TAG_union_type(Dwarf_Die die, die_info_t &die_info) {
+    void analyze_DW_TAG_union_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // structとunionがほぼ同じなので共通処理にする
-        analyze_DW_TAG_struct_union<DW_TAG_union_type>(die, die_info, type_tag::struct_);
+        analyze_DW_TAG_struct_union<DW_TAG_union_type>(die, dw_info, die_info, type_tag::struct_);
     }
 
     template <size_t DW_TAG>
-    void analyze_DW_TAG_struct_union(Dwarf_Die die, die_info_t &die_info, type_tag tag) {
-        int res;
+    void analyze_DW_TAG_struct_union(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info, type_tag tag) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, tag);
-        analyze_DW_AT<DW_TAG>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, tag);
+        analyze_DW_AT<DW_TAG>(die, analyze_info_, info);
         // child dieチェック
-        bool result = get_child_die(die, [this, &die_info, &info](Dwarf_Die child) -> bool {
-            analyze_DW_TAG_struct_union_child<DW_TAG>(child, die_info, info);
+        bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_struct_union_child<DW_TAG>(child, dw_info, die_info, info);
             return true;
         });
         // 異常が発生していたらfalseが返される
@@ -641,7 +622,7 @@ private:
         }
     }
     template <Dwarf_Half DW_TAG>
-    void analyze_DW_TAG_struct_union_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
+    void analyze_DW_TAG_struct_union_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_info &parent_type) {
         int result;
         Dwarf_Half tag;
         result = dwarf_tag(die, &tag, &dw_error);
@@ -654,7 +635,7 @@ private:
         switch (die_info.tag) {
             case DW_TAG_member: {
                 // member情報を作成
-                auto mem_info = analyze_DW_TAG_member(die, die_info);
+                auto mem_info = analyze_DW_TAG_member(die, dw_info, die_info);
                 // parentのmemberに登録
                 parent_type.child_list.push_back(std::move(mem_info));
                 return;
@@ -664,25 +645,25 @@ private:
             // member要素にはならない
             // 解析して型情報として登録する
             case DW_TAG_array_type:
-                analyze_DW_TAG_array_type(die, die_info);
+                analyze_DW_TAG_array_type(die, dw_info, die_info);
                 return;
 
             case DW_TAG_reference_type:
-                analyze_DW_TAG_reference_type(die, die_info);
+                analyze_DW_TAG_reference_type(die, dw_info, die_info);
                 return;
 
             // type-qualifier
             case DW_TAG_const_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_const_type>(die, die_info, type_tag::const_);
+                analyze_DW_TAG_type_qualifier<DW_TAG_const_type>(die, dw_info, die_info, type_tag::const_);
                 return;
             case DW_TAG_pointer_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_pointer_type>(die, die_info, type_tag::pointer);
+                analyze_DW_TAG_type_qualifier<DW_TAG_pointer_type>(die, dw_info, die_info, type_tag::pointer);
                 return;
             case DW_TAG_restrict_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_restrict_type>(die, die_info, type_tag::restrict_);
+                analyze_DW_TAG_type_qualifier<DW_TAG_restrict_type>(die, dw_info, die_info, type_tag::restrict_);
                 return;
             case DW_TAG_volatile_type:
-                analyze_DW_TAG_type_qualifier<DW_TAG_volatile_type>(die, die_info, type_tag::volatile_);
+                analyze_DW_TAG_type_qualifier<DW_TAG_volatile_type>(die, dw_info, die_info, type_tag::volatile_);
                 return;
 
             // 関数タグ
@@ -704,18 +685,12 @@ private:
         printf("no impl : DW_TAG_struct/union child : %s (%u)\n", name, die_info.tag);
     }
 
-    type_child analyze_DW_TAG_member(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    type_child analyze_DW_TAG_member(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::member);
-        analyze_DW_AT<DW_TAG_member>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::member);
+        analyze_DW_AT<DW_TAG_member>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_member");
@@ -723,45 +698,17 @@ private:
         return &info;
     }
 
-    void debug_dump_no_impl_child(Dwarf_Die die, char const *parent_tag) {
-        // child dieチェック
-        bool result = get_child_die(die, [this, parent_tag](Dwarf_Die child) -> bool {
-            // analyze_die(child);
-            int result;
-            Dwarf_Half tag;
-            result = dwarf_tag(child, &tag, &dw_error);
-            if (result != DW_DLV_OK) {
-                utility::error_happen(&dw_error);
-            }
-
-            const char *name = 0;
-            dwarf_get_TAG_name(tag, &name);
-            printf("no impl : %s child : %s (%u)\n", parent_tag, name, tag);
-            return true;
-        });
-        // 異常が発生していたらfalseが返される
-        if (!result) {
-            utility::error_happen(&dw_error);
-        }
-    }
-
-    void analyze_DW_TAG_array_type(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    void analyze_DW_TAG_array_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::array);
-        analyze_DW_AT<DW_TAG_array_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::array);
+        analyze_DW_AT<DW_TAG_array_type>(die, analyze_info_, info);
         // omitチェック
         check_omitted_type_info(info);
         // child dieチェック
-        bool result = get_child_die(die, [this, &die_info, &info](Dwarf_Die child) -> bool {
-            analyze_DW_TAG_array_type_child(child, die_info, info);
+        bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_array_type_child(child, dw_info, die_info, info);
             return true;
         });
         // 異常が発生していたらfalseが返される
@@ -770,7 +717,7 @@ private:
         }
     }
 
-    void analyze_DW_TAG_array_type_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
+    void analyze_DW_TAG_array_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &parent_die_info, type_info &parent_type) {
         int result;
         Dwarf_Half tag;
         result = dwarf_tag(die, &tag, &dw_error);
@@ -783,7 +730,7 @@ private:
         switch (die_info.tag) {
             case DW_TAG_subrange_type: {
                 // subrange情報を作成
-                auto child_info = analyze_DW_TAG_subrange_type(die, die_info);
+                auto child_info = analyze_DW_TAG_subrange_type(die, dw_info, die_info);
                 // array要素数を示す
                 if (child_info->count) {
                     parent_type.count = *child_info->count;
@@ -804,18 +751,12 @@ private:
         printf("no impl : DW_TAG_array_type child : %s (%u)\n", name, die_info.tag);
     }
 
-    type_child analyze_DW_TAG_subrange_type(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    type_child analyze_DW_TAG_subrange_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::member);
-        analyze_DW_AT<DW_TAG_subrange_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::member);
+        analyze_DW_AT<DW_TAG_subrange_type>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_subrange_type");
@@ -824,21 +765,15 @@ private:
     }
 
     // DW_TAG_subroutine_type
-    void analyze_DW_TAG_subroutine_type(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    void analyze_DW_TAG_subroutine_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::func);
-        analyze_DW_AT<DW_TAG_subroutine_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::func);
+        analyze_DW_AT<DW_TAG_subroutine_type>(die, analyze_info_, info);
         // child dieチェック
-        bool result = get_child_die(die, [this, &die_info, &info](Dwarf_Die child) -> bool {
-            analyze_DW_TAG_subroutine_type_child(child, die_info, info);
+        bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_subroutine_type_child(child, dw_info, die_info, info);
             return true;
         });
         // 異常が発生していたらfalseが返される
@@ -846,7 +781,7 @@ private:
             utility::error_happen(&dw_error);
         }
     }
-    void analyze_DW_TAG_subroutine_type_child(Dwarf_Die die, die_info_t &parent_die_info, type_info &parent_type) {
+    void analyze_DW_TAG_subroutine_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_info &parent_type) {
         int result;
         Dwarf_Half tag;
         result = dwarf_tag(die, &tag, &dw_error);
@@ -859,7 +794,7 @@ private:
         switch (die_info.tag) {
             case DW_TAG_formal_parameter: {
                 // member情報を作成
-                auto mem_info = analyze_DW_TAG_formal_parameter(die, die_info);
+                auto mem_info = analyze_DW_TAG_formal_parameter(die, dw_info, die_info);
                 // parentのchildにparameterとして登録
                 parent_type.child_list.push_back(std::move(mem_info));
                 return;
@@ -874,18 +809,12 @@ private:
         printf("no impl : DW_TAG_subroutine_type child : %s (%u)\n", name, die_info.tag);
     }
     // DW_TAG_formal_parameter
-    type_child analyze_DW_TAG_formal_parameter(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    type_child analyze_DW_TAG_formal_parameter(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::parameter);
-        analyze_DW_AT<DW_TAG_formal_parameter>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::parameter);
+        analyze_DW_AT<DW_TAG_formal_parameter>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_formal_parameter");
@@ -894,18 +823,12 @@ private:
     }
 
     // DW_TAG_reference_type
-    void analyze_DW_TAG_reference_type(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    void analyze_DW_TAG_reference_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::reference);
-        analyze_DW_AT<DW_TAG_reference_type>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::reference);
+        analyze_DW_AT<DW_TAG_reference_type>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_reference_type");
@@ -913,39 +836,41 @@ private:
 
     // DW_TAG_TAG_type_qualifier
     template <Dwarf_Half DW_TAG>
-    void analyze_DW_TAG_type_qualifier(Dwarf_Die die, die_info_t &die_info, type_tag tag) {
+    void analyze_DW_TAG_type_qualifier(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_tag tag) {
         int res;
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
-        res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
-        if (res != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
+        Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, tag);
-        analyze_DW_AT<DW_TAG>(dw_dbg, die, &dw_error, dwarf_info_, info);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, tag);
+        analyze_DW_AT<DW_TAG>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_const/pointer/restrict/volatile_type");
     }
 
     // DW_TAG_typedef
-    void analyze_DW_TAG_typedef(Dwarf_Die die, die_info_t &die_info) {
-        int res;
+    void analyze_DW_TAG_typedef(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
         // DIE offset取得
-        Dwarf_Off dw_global_offset;
-        Dwarf_Off dw_local_offset;
+        Dwarf_Off offset = get_die_offset(die);
+        // 型情報作成
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::typedef_);
+        analyze_DW_AT<DW_TAG_typedef>(die, analyze_info_, info);
+        // child dieチェックしない
+        // childが存在したら表示だけ出しておく
+        debug_dump_no_impl_child(die, "DW_TAG_typedef");
+    }
+
+    Dwarf_Off get_die_offset(Dwarf_Die die) {
+        int res;
+        Dwarf_Off dw_global_offset = 0;
+        Dwarf_Off dw_local_offset  = 0;
+        // DIE offset取得
         res = dwarf_die_offsets(die, &dw_global_offset, &dw_local_offset, &dw_error);
         if (res != DW_DLV_OK) {
             utility::error_happen(&dw_error);
         }
-        // 型情報作成
-        auto &info = dwarf_info_.type_tbl.make_new_type_info(dw_global_offset, type_tag::typedef_);
-        analyze_DW_AT<DW_TAG_typedef>(dw_dbg, die, &dw_error, dwarf_info_, info);
-        // child dieチェックしない
-        // childが存在したら表示だけ出しておく
-        debug_dump_no_impl_child(die, "DW_TAG_typedef");
+        //
+        return dw_global_offset;
     }
 
     void check_omitted_type_info(type_info &info) {
@@ -953,6 +878,28 @@ private:
         // decl_fileが省略された場合、[1]のファイルが該当する
         if (info.decl_file == 0) {
             info.decl_file = 1;
+        }
+    }
+
+    void debug_dump_no_impl_child(Dwarf_Die die, char const *parent_tag) {
+        // child dieチェック
+        bool result = get_child_die(die, [this, parent_tag](Dwarf_Die child) -> bool {
+            // analyze_die(child);
+            int res;
+            Dwarf_Half tag;
+            res = dwarf_tag(child, &tag, &dw_error);
+            if (res != DW_DLV_OK) {
+                utility::error_happen(&dw_error);
+            }
+
+            const char *name = 0;
+            dwarf_get_TAG_name(tag, &name);
+            printf("no impl : %s child : %s (%u)\n", parent_tag, name, tag);
+            return true;
+        });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            utility::error_happen(&dw_error);
         }
     }
 };

@@ -16,11 +16,16 @@ int main(int argc, char *argv[]) {
     di.set_analyze_func_info(false);
     auto result = di.open(argv[1]);
     if (result) {
+        util_dwarf::dwarf_info dw_info;
+
         clock_t s, t;
         s = clock();
-        di.analyze();
+        // dwarf解析
+        di.analyze(dw_info);
         t = clock();
         printf("%f\n", (double)(t - s) / CLOCKS_PER_SEC);
+
+        //
 
         di.close();
     }

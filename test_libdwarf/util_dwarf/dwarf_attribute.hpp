@@ -4,6 +4,7 @@
 #include <dwarf.h>
 #include <libdwarf.h>
 
+#include "dwarf_expression.hpp"
 #include "dwarf_form.hpp"
 #include "dwarf_info.hpp"
 #include "utility.hpp"
@@ -19,16 +20,16 @@ namespace util_dwarf {
 // DW_AT_location
 // exprloc, loclistptr
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_location(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_location(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.location = *result;
     }
 }
 // DW_AT_data_member_location
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_data_member_location(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_data_member_location(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.data_member_location = *result;
     } else {
@@ -38,8 +39,8 @@ void get_DW_AT_data_member_location(Dwarf_Attribute dw_attr, dwarf_info &di, T &
 
 // DW_AT_const_value
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_const_value(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_const_value(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.const_value = *result;
     } else {
@@ -49,13 +50,13 @@ void get_DW_AT_const_value(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_name
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_name(Dwarf_Attribute dw_attr, T &info) {
+void get_DW_AT_name(dwarf_analyze_info &dw_info, T &info) {
     char *str         = nullptr;
     Dwarf_Error error = nullptr;
     int result;
-    result = dwarf_formstring(dw_attr, &str, &error);
+    result = dwarf_formstring(dw_info.dw_attr, &str, &dw_info.dw_error);
     if (result != DW_DLV_OK) {
-        utility::error_happen(&error);
+        utility::error_happen(&dw_info.dw_error);
     }
     info.name = str;
 }
@@ -64,15 +65,15 @@ void get_DW_AT_name(Dwarf_Attribute dw_attr, T &info) {
 //     char *str         = nullptr;
 //     Dwarf_Error error = nullptr;
 //     int result;
-//     result = dwarf_formstring(dw_attr, &str, &error);
+//     result = dwarf_formstring(dw_info.dw_attr, &str, &error);
 //     if (result == DW_DLV_OK) {
 //         info.name = str;
 //     }
 // }
 // DW_AT_byte_size
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_byte_size(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_byte_size(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.byte_size = *result;
     } else {
@@ -81,8 +82,8 @@ void get_DW_AT_byte_size(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 }
 // DW_AT_bit_offset
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_bit_offset(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_bit_offset(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.bit_offset = *result;
     } else {
@@ -91,8 +92,8 @@ void get_DW_AT_bit_offset(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 }
 // DW_AT_bit_size
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_bit_size(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_bit_size(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.bit_size = *result;
     } else {
@@ -101,8 +102,8 @@ void get_DW_AT_bit_size(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 }
 // DW_AT_data_bit_offset
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_data_bit_offset(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_data_bit_offset(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.data_bit_offset = *result;
     } else {
@@ -112,8 +113,8 @@ void get_DW_AT_data_bit_offset(Dwarf_Attribute dw_attr, dwarf_info &di, T &info)
 
 // DW_AT_signature
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_signature(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_signature(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.signature = *result;
     } else {
@@ -123,8 +124,8 @@ void get_DW_AT_signature(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_accessibility
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_accessibility(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_accessibility(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     // DW_ACCESS_public
     // DW_ACCESS_private
     // DW_ACCESS_protected
@@ -137,24 +138,24 @@ void get_DW_AT_accessibility(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_upper_bound
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_upper_bound(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_upper_bound(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.upper_bound = *result;
     }
 }
 // DW_AT_lower_bound
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_lower_bound(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_lower_bound(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.lower_bound = *result;
     }
 }
 // DW_AT_count
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_count(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_count(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.count = *result;
     }
@@ -162,8 +163,8 @@ void get_DW_AT_count(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_address_class
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_address_class(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_address_class(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.address_class = *result;
     }
@@ -171,8 +172,8 @@ void get_DW_AT_address_class(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_decl_column
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_decl_column(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_decl_column(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.decl_column = *result;
     } else {
@@ -182,8 +183,8 @@ void get_DW_AT_decl_column(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_decl_file 実装
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_decl_file(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_decl_file(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.decl_file             = *result;
         info.decl_file_is_external = (info.decl_file != 1);
@@ -194,8 +195,8 @@ void get_DW_AT_decl_file(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_decl_line
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_decl_line(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_decl_line(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.decl_line = *result;
     } else {
@@ -205,8 +206,8 @@ void get_DW_AT_decl_line(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_encoding
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_encoding(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_encoding(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.encoding = *result;
     } else {
@@ -216,8 +217,8 @@ void get_DW_AT_encoding(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_sibling
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_sibling(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_sibling(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.sibling = *result;
     } else {
@@ -226,8 +227,8 @@ void get_DW_AT_sibling(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 }
 // DW_AT_type
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_type(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_type(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.type = *result;
     }
@@ -235,8 +236,8 @@ void get_DW_AT_type(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_endianity
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_endianity(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_endianity(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.type = *result;
     }
@@ -244,8 +245,8 @@ void get_DW_AT_endianity(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_binary_scale
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_binary_scale(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
-    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_attr, di);
+void get_DW_AT_binary_scale(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.binary_scale = *result;
     } else {
@@ -255,13 +256,13 @@ void get_DW_AT_binary_scale(Dwarf_Attribute dw_attr, dwarf_info &di, T &info) {
 
 // DW_AT_external 実装
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_external(Dwarf_Attribute dw_attr, T &info) {
+void get_DW_AT_external(dwarf_analyze_info &dw_info, T &info) {
     Dwarf_Bool returned_bool = 0;
     Dwarf_Error error        = nullptr;
     int result;
-    result = dwarf_formflag(dw_attr, &returned_bool, &error);
+    result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
     if (result != DW_DLV_OK) {
-        utility::error_happen(&error);
+        utility::error_happen(&dw_info.dw_error);
     }
     info.external = (returned_bool == 1);
 }
@@ -278,13 +279,13 @@ void get_DW_AT_external(Dwarf_Attribute dw_attr, T &info) {
 
 //
 template <Dwarf_Half DW_TAG, typename T>
-void get_DW_AT_declaration(Dwarf_Attribute dw_attr, T &info) {
+void get_DW_AT_declaration(dwarf_analyze_info &dw_info, T &info) {
     Dwarf_Bool returned_bool = 0;
     Dwarf_Error error        = nullptr;
     int result;
-    result = dwarf_formflag(dw_attr, &returned_bool, &error);
+    result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
     if (result != DW_DLV_OK) {
-        utility::error_happen(&error);
+        utility::error_happen(&dw_info.dw_error);
     }
     info.declaration = (returned_bool == 1);
 }
@@ -295,20 +296,22 @@ void get_DW_AT_declaration(Dwarf_Attribute dw_attr, T &info) {
 
 // DW_AT_name
 template <Dwarf_Half DW_TAG, typename T>
-void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info &di, T &info) {
+void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analyze_info &dw_info, T &info) {
+    dw_info.dw_attr = dw_attr;
+
     // Attrubute解析
     switch (attrnum) {
         case DW_AT_sibling:
-            get_DW_AT_sibling<DW_TAG>(dw_attr, di, info);
+            get_DW_AT_sibling<DW_TAG>(dw_info, info);
             return;
         case DW_AT_location:
             if constexpr (std::is_same_v<T, dwarf_info::var_info>) {
-                get_DW_AT_location<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_location<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_name:
-            get_DW_AT_name<DW_TAG>(dw_attr, info);
+            get_DW_AT_name<DW_TAG>(dw_info, info);
             return;
 
         case DW_AT_ordering:
@@ -316,17 +319,17 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
         case DW_AT_byte_size:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_byte_size<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_byte_size<DW_TAG>(dw_info, info);
             }
             return;
         case DW_AT_bit_offset:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_bit_offset<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_bit_offset<DW_TAG>(dw_info, info);
             }
             return;
         case DW_AT_bit_size:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_bit_size<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_bit_size<DW_TAG>(dw_info, info);
             }
             return;
         case DW_AT_element_list:
@@ -345,7 +348,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
         case DW_AT_const_value:
             if constexpr (std::is_same_v<T, dwarf_info::var_info>) {
-                get_DW_AT_const_value<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_const_value<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -357,7 +360,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_lower_bound:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_lower_bound<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_lower_bound<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -371,7 +374,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_upper_bound:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_upper_bound<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_upper_bound<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -380,13 +383,13 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_accessibility:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_accessibility<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_accessibility<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_address_class:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_address_class<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_address_class<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -397,28 +400,28 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_count:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_count<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_count<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_data_member_location:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_data_member_location<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_data_member_location<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_decl_column:
-            get_DW_AT_decl_column<DW_TAG>(dw_attr, di, info);
+            get_DW_AT_decl_column<DW_TAG>(dw_info, info);
             return;
         case DW_AT_decl_file:
-            get_DW_AT_decl_file<DW_TAG>(dw_attr, di, info);
+            get_DW_AT_decl_file<DW_TAG>(dw_info, info);
             return;
         case DW_AT_decl_line:
-            get_DW_AT_decl_line<DW_TAG>(dw_attr, di, info);
+            get_DW_AT_decl_line<DW_TAG>(dw_info, info);
             return;
 
         case DW_AT_declaration:
-            get_DW_AT_declaration<DW_TAG>(dw_attr, info);
+            get_DW_AT_declaration<DW_TAG>(dw_info, info);
             return;
 
         case DW_AT_discr_list:
@@ -426,13 +429,13 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_encoding:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_encoding<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_encoding<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_external:
             if constexpr (std::is_same_v<T, dwarf_info::var_info>) {
-                get_DW_AT_external<DW_TAG>(dw_attr, info);
+                get_DW_AT_external<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -448,7 +451,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_type:
-            get_DW_AT_type<DW_TAG>(dw_attr, di, info);
+            get_DW_AT_type<DW_TAG>(dw_info, info);
             return;
 
         case DW_AT_use_location:
@@ -472,7 +475,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_binary_scale:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_binary_scale<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_binary_scale<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -488,7 +491,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
             break;
 
         case DW_AT_endianity:
-            get_DW_AT_endianity<DW_TAG>(dw_attr, di, info);
+            get_DW_AT_endianity<DW_TAG>(dw_info, info);
             return;
 
         case DW_AT_elemental:
@@ -498,7 +501,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_signature:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_signature<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_signature<DW_TAG>(dw_info, info);
             }
             return;
         case DW_AT_main_subprogram:
@@ -506,7 +509,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 
         case DW_AT_data_bit_offset:
             if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
-                get_DW_AT_data_bit_offset<DW_TAG>(dw_attr, di, info);
+                get_DW_AT_data_bit_offset<DW_TAG>(dw_info, info);
             }
             return;
 
@@ -543,11 +546,12 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
         case DW_AT_deleted:
         case DW_AT_defaulted:
         case DW_AT_loclists_base:
+        default:
             break;
     }
 
     // no impl
-    const char *attrname = 0;
+    const char *attrname = nullptr;
     dwarf_get_AT_name(attrnum, &attrname);
     printf("no impl : %s (%u)\n", attrname, attrnum);
 }
@@ -561,20 +565,20 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_info 
 /// @param di
 /// @param info
 template <Dwarf_Half DW_TAG, typename T>
-void analyze_DW_AT(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Error *dw_error, dwarf_info &di, T &info) {
+void analyze_DW_AT(Dwarf_Die die, dwarf_analyze_info &dw_info, T &info) {
     Dwarf_Signed atcount;
     Dwarf_Attribute *atlist;
     Dwarf_Signed i = 0;
     int errv;
 
-    errv = dwarf_attrlist(die, &atlist, &atcount, dw_error);
+    errv = dwarf_attrlist(die, &atlist, &atcount, &dw_info.dw_error);
     if (errv == DW_DLV_NO_ENTRY) {
         // DW_AT_* なし
         return;
     }
     if (errv == DW_DLV_ERROR) {
         // return errv;
-        utility::error_happen(dw_error);
+        utility::error_happen(&dw_info.dw_error);
         return;
     }
     for (i = 0; i < atcount; ++i) {
@@ -584,11 +588,11 @@ void analyze_DW_AT(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Error *dw_error, dwarf_
             libdwarf functions and likely
             returning DW_DLV_ERROR if
             what you call gets DW_DLV_ERROR */
-        errv = dwarf_whatattr(atlist[i], &attrnum, dw_error);
+        errv = dwarf_whatattr(atlist[i], &attrnum, &dw_info.dw_error);
         if (errv != DW_DLV_OK) {
             /* Something really bad happened. */
             // return errv;
-            utility::error_happen(dw_error);
+            utility::error_happen(&dw_info.dw_error);
             return;
         }
 
@@ -598,12 +602,12 @@ void analyze_DW_AT(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Error *dw_error, dwarf_
         // printf("Attribute[%ld], value %u name %s\n", (long int)i, attrnum, attrname);
 
         // DW_AT_*解析
-        analyze_DW_AT_impl<DW_TAG>(atlist[i], attrnum, di, info);
+        analyze_DW_AT_impl<DW_TAG>(atlist[i], attrnum, dw_info, info);
 
         dwarf_dealloc_attribute(atlist[i]);
         atlist[i] = 0;
     }
-    dwarf_dealloc(dbg, atlist, DW_DLA_LIST);
+    dwarf_dealloc(dw_info.dw_dbg, atlist, DW_DLA_LIST);
 }
 
 }  // namespace util_dwarf

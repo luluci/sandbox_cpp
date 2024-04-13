@@ -1,7 +1,10 @@
 #pragma once
 
+#include <dwarf.h>
 #include <libdwarf.h>
 
+#include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <vector>
 

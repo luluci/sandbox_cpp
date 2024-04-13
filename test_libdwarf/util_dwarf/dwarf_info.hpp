@@ -135,6 +135,69 @@ struct dwarf_info
             result.first->second.tag |= (uint16_t)tag;
             return result.first->second;
         }
+
+        // DIEから収集したデータは木構造で情報が分散している
+        // ルートオブジェクトに情報を集約して型情報を単一にする
+        void build() {
+            for (auto &elem : type_map) {
+                build_node(elem.second);
+            }
+        }
+
+        void build_node(type_info &info) {
+            // debug
+            if (info.tag == (uint16_t)type_tag::typedef_) {
+                info;
+            }
+
+            // type(offset)を辿って型情報を更新していく
+            // child要素が無ければ終了
+            type_info *curr_info = &info;
+            while (curr_info->type) {
+                // child typeの存在チェック
+                // 無ければ終了
+                auto it = type_map.find(*(curr_info->type));
+                if (it == type_map.end()) {
+                    break;
+                }
+                //
+                auto &child = it->second;
+                switch (child.tag) {
+                    case (uint16_t)type_tag::base:
+                        adapt_info_base(info, child);
+                        break;
+
+                    default:
+                        // 実装忘れ
+                        printf("no impl : build_node : 0x%02X\n", child.tag);
+                        break;
+                }
+
+                // 次ノード更新
+                curr_info = &child;
+            }
+        }
+
+    private:
+        void adapt_info_base(type_info &dst, type_info &src) {
+            //
+            adapt_value(dst.name, src.name);
+            adapt_value(dst.encoding, src.encoding);
+            adapt_value(dst.byte_size, src.byte_size);
+            //
+            dst.tag |= src.tag;
+        }
+
+        void adapt_value(std::string &dst, std::string &src) {
+            if (dst.size() == 0) {
+                dst = src;
+            }
+        }
+        void adapt_value(Dwarf_Unsigned &dst, Dwarf_Unsigned &src) {
+            if (dst == 0) {
+                dst = src;
+            }
+        }
     };
 
     // compile_unitから取得する情報
@@ -169,22 +232,18 @@ struct dwarf_info
         }
     };
 
-    // libdwarf APIデータ
-    Dwarf_Debug *dw_dbg;
-
     // elf machine_architectureデータ
     elf::machine_architecture machine_arch;
     arch::arch_info *arch_info;
 
     // DIE解析情報
-    compile_unit_info cu_info;
     var_info_container global_var_tbl;
     type_info_container type_tbl;
 
-    // DWARF expression 制御クラス
-    dwarf_expression dwarf_expr;
+    // 必要ならバッファするように変更
+    // compile_unit_info cu_info;
 
-    dwarf_info() : dw_dbg(nullptr), machine_arch(), cu_info(), dwarf_expr() {
+    dwarf_info() : machine_arch(), arch_info(nullptr) {
     }
 };
 
