@@ -77,25 +77,27 @@ struct dwarf_info
     };
 
     // 型タグ
-    enum class type_tag : uint16_t
+    struct type_tag
     {
-        none      = 0x0000,
-        base      = 0x0001,
-        array     = 0x0002,
-        struct_   = 0x0004,
-        union_    = 0x0008,
-        func      = 0x0010,
-        parameter = 0x0020,
-        typedef_  = 0x0040,
-        const_    = 0x0080,
-        volatile_ = 0x0100,
-        pointer   = 0x0200,
-        restrict_ = 0x0400,
-        enum_     = 0x0800,
-        reference = 0x1000,
-        member    = 0x2000,  // struct,union,classのメンバ
+        using type = uint16_t;
 
-        func_ptr = func | pointer,
+        static constexpr type none      = 0x0000;
+        static constexpr type base      = 0x0001;
+        static constexpr type array     = 0x0002;
+        static constexpr type struct_   = 0x0004;
+        static constexpr type union_    = 0x0008;
+        static constexpr type func      = 0x0010;
+        static constexpr type parameter = 0x0020;
+        static constexpr type typedef_  = 0x0040;
+        static constexpr type const_    = 0x0080;
+        static constexpr type volatile_ = 0x0100;
+        static constexpr type pointer   = 0x0200;
+        static constexpr type restrict_ = 0x0400;
+        static constexpr type enum_     = 0x0800;
+        static constexpr type reference = 0x1000;
+        static constexpr type member    = 0x2000;  // struct,union,classのメンバ
+
+        static constexpr type func_ptr = func | pointer;
     };
 
     struct type_info
@@ -166,9 +168,9 @@ struct dwarf_info
         }
 
         // type_map操作関数
-        type_info &make_new_type_info(Dwarf_Off offset, type_tag tag) {
+        type_info &make_new_type_info(Dwarf_Off offset, type_tag::type tag) {
             auto result = type_map.try_emplace(offset, type_info());
-            result.first->second.tag |= (uint16_t)tag;
+            result.first->second.tag |= tag;
             return result.first->second;
         }
     };

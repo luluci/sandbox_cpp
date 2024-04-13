@@ -23,7 +23,7 @@ public:
 
     bool eval_DW_OP_unimpl(uint8_t *buff, size_t buff_size) {
         //
-        printf("no implemented! : DW_OP(0x%02X)\n", buff[0]);
+        printf("no implemented! : DW_OP(0x%02X), ope_size=%lld\n", buff[0], buff_size);
         return false;
     }
     //
@@ -386,6 +386,9 @@ public:
             case DW_OP_reg30:
                 break;
             case DW_OP_reg31:
+                break;
+
+            default:
                 break;
         }
 

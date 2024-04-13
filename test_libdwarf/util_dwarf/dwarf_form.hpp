@@ -25,15 +25,15 @@ ReturnT get_DW_FORM_block1(dwarf_analyze_info &info) {
         return std::nullopt;
     }
     // [ length data1 data2 ... ] or [ DWARF expr ]
-    Dwarf_Unsigned len   = 1 + ((uint8_t *)tempb->bl_data)[0];
+    Dwarf_Unsigned len   = 1 + (static_cast<uint8_t *>(tempb->bl_data))[0];
     Dwarf_Unsigned value = 0;
     if (tempb->bl_len == len) {
         // length byte と valueの要素数が一致するとき、block1として解釈
         // dataをlittle endianで結合
-        value = utility::concat_le((uint8_t *)tempb->bl_data, 1, tempb->bl_len);
+        value = utility::concat_le(static_cast<uint8_t *>(tempb->bl_data), 1, tempb->bl_len);
     } else {
         // 一致しないとき、DWARF expression として解釈
-        info.dw_expr.eval((uint8_t *)tempb->bl_data, tempb->bl_len);
+        info.dw_expr.eval(static_cast<uint8_t *>(tempb->bl_data), tempb->bl_len);
         auto eval = info.dw_expr.pop();
         if (!eval) {
             // ありえない
@@ -59,7 +59,7 @@ ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
     // N = 1: [ length data1 data2 ... ] or [ DWARF expr ]
     // N = 2: [ length1 length2 data1 data2 ... ] or [ DWARF expr ]
     // N = 4: [ length1 length2 length3 length4 data1 data2 ... ] or [ DWARF expr ]
-    auto buff_ptr        = (uint8_t *)tempb->bl_data;
+    auto buff_ptr        = static_cast<uint8_t *>(tempb->bl_data);
     auto buff_len        = tempb->bl_len;
     Dwarf_Unsigned len   = N + utility::concat_le(buff_ptr, 0, N);
     Dwarf_Unsigned value = 0;
@@ -229,6 +229,9 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
 
         case DW_FORM_exprloc:
             return get_DW_FORM_exprloc<T>(info);
+
+        default:
+            break;
     }
 
     return std::nullopt;

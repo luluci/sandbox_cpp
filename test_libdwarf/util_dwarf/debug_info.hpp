@@ -24,20 +24,51 @@ public:
         Dwarf_Unsigned bit_offset;
         Dwarf_Unsigned bit_size;
         Dwarf_Unsigned encoding;  // DW_ATE_*
+        Dwarf_Unsigned count;
+        Dwarf_Unsigned address_class;
+        Dwarf_Unsigned pointer_depth;
 
-        type_info() : tag(0), name(nullptr), byte_size(0), bit_offset(0), bit_size(0), encoding(0) {
+        bool is_const;
+        bool is_restrict;
+        bool is_volatile;
+
+        // member or parameter
+        using child_list_t = dwarf_info::type_info::child_list_t;
+        child_list_t *child_list;
+        // array用
+        type_info *sub_info;
+
+        type_info()
+            : tag(0),
+              name(nullptr),
+              byte_size(0),
+              bit_offset(0),
+              bit_size(0),
+              encoding(0),
+              count(0),
+              address_class(0),
+              pointer_depth(0),
+              is_const(false),
+              is_restrict(false),
+              is_volatile(false),
+              child_list(nullptr),
+              sub_info(nullptr) {
         }
     };
 
     // 型情報
     using type_map_t = std::map<Dwarf_Unsigned, type_info>;
     type_map_t type_map;
+    std::list<type_info> sub_type_list;
+
+    // 固定情報
+    std::string name_void;
 
 private:
     dwarf_info &dw_info_;
 
 public:
-    debug_info(dwarf_info &dw_info) : dw_info_(dw_info) {
+    debug_info(dwarf_info &dw_info) : dw_info_(dw_info), name_void("void") {
     }
 
     // DIEから収集したデータは木構造で情報が分散している
@@ -92,25 +123,91 @@ private:
         }
         // type_infoに今回対象となるoffsetの情報を適用する
         adapt_info(dbg_info, root_dw_info);
+        adapt_info_fix(dbg_info);
     }
 
     void adapt_info(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         switch (dw_info.tag) {
-            case (uint16_t)type_tag::base:
+            case type_tag::base:
                 adapt_info_base(dbg_info, dw_info);
                 break;
 
-            case (uint16_t)type_tag::func:
+            case type_tag::func:
                 adapt_info_func(dbg_info, dw_info);
                 break;
 
-            case (uint16_t)type_tag::typedef_:
+            case type_tag::typedef_:
+                adapt_info_typedef(dbg_info, dw_info);
+                break;
+
+            case type_tag::struct_:
+            case type_tag::union_:
+                adapt_info_struct_union(dbg_info, dw_info);
+                break;
+
+            case type_tag::array:
+                adapt_info_array(dbg_info, dw_info);
+                break;
+
+            case type_tag::pointer:
+                adapt_info_pointer(dbg_info, dw_info);
+                break;
+
+            case type_tag::const_:
+                adapt_info_const(dbg_info, dw_info);
+                break;
+
+            case type_tag::restrict_:
+                adapt_info_restrict(dbg_info, dw_info);
+                break;
+
+            case type_tag::volatile_:
+                adapt_info_volatile(dbg_info, dw_info);
+                break;
+
+            case type_tag::enum_:
+                adapt_info_enum(dbg_info, dw_info);
                 break;
 
             default:
                 // 実装忘れ
                 printf("no impl : build_node : 0x%02X\n", dw_info.tag);
                 break;
+        }
+    }
+
+    void adapt_info_fix(type_info &dbg_info) {
+        // 後処理
+        // void型ケア
+        // tagがnoneのときはvoid型？
+        if (dbg_info.tag == 0) {
+            dbg_info.tag = type_tag::none;
+        }
+        // unnamedのときはvoid型？
+        if (dbg_info.name == nullptr) {
+            dbg_info.name = &name_void;
+
+            // pointer size
+            if (dbg_info.byte_size == 0) {
+                dbg_info.byte_size = dw_info_.machine_arch.obj_pointersize;
+            }
+        }
+        // byte_sizeケア
+        if (dbg_info.byte_size == 0) {
+            // 関数ポインタのとき？
+            if ((dbg_info.tag & type_tag::func_ptr) == type_tag::func_ptr) {
+                dbg_info.byte_size = dw_info_.machine_arch.obj_pointersize;
+            }
+        }
+        // arrayケア
+        if ((dbg_info.tag & type_tag::array) == type_tag::array) {
+            // arrayに関するデータをマスクしたデータが要素型のデータになる
+            sub_type_list.push_back(dbg_info);
+            auto &sub_type    = sub_type_list.back();
+            dbg_info.sub_info = &sub_type;
+            //
+            sub_type.tag &= ~(type_tag::array);
+            sub_type.count = 0;
         }
     }
 
@@ -124,23 +221,111 @@ private:
         dbg_info.tag |= dw_info.tag;
     }
 
-    void adapt_info_func(type_info &dbg_info, dwarf_info::type_info &dw_info) {
-        //
+    void adapt_info_enum(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
-        adapt_value(dbg_info.encoding, dw_info.encoding);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
         //
         dbg_info.tag |= dw_info.tag;
     }
 
+    void adapt_info_func(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        //
+        adapt_value(dbg_info.name, dw_info.name);
+        adapt_value(dbg_info.byte_size, dw_info.byte_size);
+        adapt_value(dbg_info.child_list, dw_info.child_list);
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_typedef(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // 対象データが空ならdw_infoを反映する
+        adapt_value(dbg_info.name, dw_info.name);
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_struct_union(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // 対象データが空ならdw_infoを反映する
+        adapt_value(dbg_info.name, dw_info.name);
+        adapt_value(dbg_info.byte_size, dw_info.byte_size);
+        adapt_value(dbg_info.child_list, dw_info.child_list);
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_array(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // 対象データが空ならdw_infoを反映する
+        adapt_value(dbg_info.name, dw_info.name);
+        adapt_value(dbg_info.count, dw_info.count);
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_pointer(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // ポインタサイズが優先のため上書き
+        if (dw_info.address_class) {
+            // address_classを持っているとき
+            dbg_info.address_class = *dw_info.address_class;
+            auto addr_cls_tbl      = dw_info_.arch_info[dbg_info.address_class].address_class;
+            if (addr_cls_tbl != nullptr) {
+                //
+                if (dbg_info.address_class < arch::addr_cls::size) {
+                    dbg_info.byte_size = addr_cls_tbl[dbg_info.address_class];
+                }
+            }
+        } else {
+            // address_classを持っていないとき
+            dbg_info.byte_size = dw_info.byte_size;
+        }
+        // DW_AT_*でポインタサイズを指定されていないときはアーキテクチャに従う
+        if (dbg_info.byte_size == 0) {
+            dbg_info.byte_size = dw_info_.machine_arch.obj_pointersize;
+        }
+        // ダブルポインタとかのケア
+        dbg_info.pointer_depth++;
+
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_const(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        //
+        dbg_info.is_const = true;
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+    void adapt_info_restrict(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        //
+        dbg_info.is_restrict = true;
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+    void adapt_info_volatile(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        //
+        dbg_info.is_volatile = true;
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
     void adapt_value(std::string *&dst, std::string &src) {
-        if (dst == nullptr) {
+        if (dst == nullptr && src.size() > 0) {
             dst = &src;
         }
     }
     void adapt_value(Dwarf_Unsigned &dst, Dwarf_Unsigned &src) {
         if (dst == 0) {
             dst = src;
+        }
+    }
+    void adapt_value(type_info::child_list_t *&dst, type_info::child_list_t &src) {
+        if (dst == nullptr && src.size() > 0) {
+            dst = &src;
+        }
+    }
+    void adapt_value(Dwarf_Unsigned &dst, std::optional<Dwarf_Unsigned> &src) {
+        if (dst == 0 && src) {
+            dst = *src;
         }
     }
 };
