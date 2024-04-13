@@ -107,8 +107,13 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
     std::string name;
 
     for (auto &mem : *type.child_list) {
-        auto &member    = *mem;
-        std::string tag = dump_make_tag(*member.sub_info);
+        auto &member = *mem;
+        std::string tag;
+        if (member.sub_info != nullptr) {
+            tag = dump_make_tag(*member.sub_info);
+        } else {
+            tag = dump_make_tag(member);
+        }
         //
         Dwarf_Off address = 0;
         address += base_address;

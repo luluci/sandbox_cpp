@@ -103,7 +103,7 @@ public:
             global_var_tbl.push_back(elem.get());
         }
         // ソートする
-        std::sort(global_var_tbl.begin(), global_var_tbl.end(), [](var_info *a, var_info *b) { return a->location > b->location; });
+        std::sort(global_var_tbl.begin(), global_var_tbl.end(), [](var_info *a, var_info *b) { return a->location < b->location; });
     }
 
     void memmap(std::function<void(var_info &, type_info &)> &&func) {
