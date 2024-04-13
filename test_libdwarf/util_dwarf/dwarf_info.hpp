@@ -97,12 +97,15 @@ struct dwarf_info
         static constexpr type reference = 0x1000;
         static constexpr type member    = 0x2000;  // struct,union,classのメンバ
 
-        static constexpr type func_ptr = func | pointer;
+        static constexpr type struct_union = struct_ | union_;
+        static constexpr type func_ptr     = func | pointer;
     };
 
     struct type_info
     {
         uint16_t tag;
+        Dwarf_Off offset;  // 自分自身のglobal offset
+
         std::string name;
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         bool decl_file_is_external;
@@ -171,6 +174,7 @@ struct dwarf_info
         type_info &make_new_type_info(Dwarf_Off offset, type_tag::type tag) {
             auto result = type_map.try_emplace(offset, type_info());
             result.first->second.tag |= tag;
+            result.first->second.offset = offset;
             return result.first->second;
         }
     };

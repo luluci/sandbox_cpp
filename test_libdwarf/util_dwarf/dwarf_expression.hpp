@@ -18,7 +18,8 @@ class dwarf_expression {
     static constexpr size_t default_stack_size = 10;
 
 public:
-    dwarf_expression() : stack_(default_stack_size) {
+    dwarf_expression() : stack_() {
+        stack_.reserve(default_stack_size);
     }
 
     bool eval_DW_OP_unimpl(uint8_t *buff, size_t buff_size) {
