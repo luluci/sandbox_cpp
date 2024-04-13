@@ -51,8 +51,7 @@ void get_DW_AT_const_value(dwarf_analyze_info &dw_info, T &info) {
 // DW_AT_name
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_name(dwarf_analyze_info &dw_info, T &info) {
-    char *str         = nullptr;
-    Dwarf_Error error = nullptr;
+    char *str = nullptr;
     int result;
     result = dwarf_formstring(dw_info.dw_attr, &str, &dw_info.dw_error);
     if (result != DW_DLV_OK) {
@@ -258,7 +257,6 @@ void get_DW_AT_binary_scale(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_external(dwarf_analyze_info &dw_info, T &info) {
     Dwarf_Bool returned_bool = 0;
-    Dwarf_Error error        = nullptr;
     int result;
     result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
     if (result != DW_DLV_OK) {
@@ -281,7 +279,6 @@ void get_DW_AT_external(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_declaration(dwarf_analyze_info &dw_info, T &info) {
     Dwarf_Bool returned_bool = 0;
-    Dwarf_Error error        = nullptr;
     int result;
     result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
     if (result != DW_DLV_OK) {

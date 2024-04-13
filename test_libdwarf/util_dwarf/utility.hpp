@@ -1,5 +1,7 @@
 #pragma once
 
+#define LIBDWARF_STATIC 1
+#include <dwarf.h>
 #include <libdwarf.h>
 
 #include <cstdint>

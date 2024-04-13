@@ -81,7 +81,7 @@ public:
         dwarf_file_path = (dwarf_file_path_cstr);
 
         unsigned int dw_groupnumber;
-        Dwarf_Ptr dw_errarg;
+        Dwarf_Ptr dw_errarg = nullptr;
 
         auto result = dwarf_init_path(dwarf_file_path.c_str(), dw_true_path_buff, dw_true_path_buff_len, dw_groupnumber, err_handler, dw_errarg,
                                       &dw_dbg, &dw_error);
@@ -837,7 +837,6 @@ private:
     // DW_TAG_TAG_type_qualifier
     template <Dwarf_Half DW_TAG>
     void analyze_DW_TAG_type_qualifier(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_tag tag) {
-        int res;
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成

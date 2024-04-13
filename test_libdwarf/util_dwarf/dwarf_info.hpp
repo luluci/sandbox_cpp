@@ -20,7 +20,6 @@
 
 namespace util_dwarf {
 
-// compile_unitから取得する情報
 struct dwarf_info
 {
     // 変数情報
@@ -38,6 +37,21 @@ struct dwarf_info
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
         Dwarf_Unsigned endianity;  // DW_END_*
+
+        var_info()
+            : name(),
+              external(false),
+              decl_file(0),
+              decl_file_is_external(false),
+              decl_line(0),
+              decl_column(0),
+              type(),
+              location(),
+              declaration(false),
+              const_value(0),
+              sibling(0),
+              endianity(0) {
+        }
     };
 
     // 変数情報リスト
@@ -115,6 +129,28 @@ struct dwarf_info
         using child_node_t = type_info *;
         using child_list_t = std::list<child_node_t>;
         child_list_t child_list;
+
+        type_info()
+            : tag(0),
+              name(),
+              decl_file(0),
+              decl_file_is_external(false),
+              decl_line(0),
+              decl_column(0),
+              sibling(0),
+              declaration(false),
+              type(),
+              byte_size(0),
+              bit_offset(0),
+              bit_size(0),
+              data_bit_offset(0),
+              data_member_location(0),
+              binary_scale(0),
+              signature(0),
+              accessibility(0),
+              encoding(0),
+              endianity(0) {
+        }
     };
 
     // 型情報リスト
@@ -134,69 +170,6 @@ struct dwarf_info
             auto result = type_map.try_emplace(offset, type_info());
             result.first->second.tag |= (uint16_t)tag;
             return result.first->second;
-        }
-
-        // DIEから収集したデータは木構造で情報が分散している
-        // ルートオブジェクトに情報を集約して型情報を単一にする
-        void build() {
-            for (auto &elem : type_map) {
-                build_node(elem.second);
-            }
-        }
-
-        void build_node(type_info &info) {
-            // debug
-            if (info.tag == (uint16_t)type_tag::typedef_) {
-                info;
-            }
-
-            // type(offset)を辿って型情報を更新していく
-            // child要素が無ければ終了
-            type_info *curr_info = &info;
-            while (curr_info->type) {
-                // child typeの存在チェック
-                // 無ければ終了
-                auto it = type_map.find(*(curr_info->type));
-                if (it == type_map.end()) {
-                    break;
-                }
-                //
-                auto &child = it->second;
-                switch (child.tag) {
-                    case (uint16_t)type_tag::base:
-                        adapt_info_base(info, child);
-                        break;
-
-                    default:
-                        // 実装忘れ
-                        printf("no impl : build_node : 0x%02X\n", child.tag);
-                        break;
-                }
-
-                // 次ノード更新
-                curr_info = &child;
-            }
-        }
-
-    private:
-        void adapt_info_base(type_info &dst, type_info &src) {
-            //
-            adapt_value(dst.name, src.name);
-            adapt_value(dst.encoding, src.encoding);
-            adapt_value(dst.byte_size, src.byte_size);
-            //
-            dst.tag |= src.tag;
-        }
-
-        void adapt_value(std::string &dst, std::string &src) {
-            if (dst.size() == 0) {
-                dst = src;
-            }
-        }
-        void adapt_value(Dwarf_Unsigned &dst, Dwarf_Unsigned &src) {
-            if (dst == 0) {
-                dst = src;
-            }
         }
     };
 

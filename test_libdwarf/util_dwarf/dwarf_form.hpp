@@ -114,7 +114,6 @@ std::optional<DW_FORM_ref_result_t> get_DW_FORM_ref_addr(dwarf_analyze_info &inf
 //
 std::optional<DW_FORM_ref_result_t> get_DW_FORM_ref(dwarf_analyze_info &info) {
     DW_FORM_ref_result_t ref_value;
-    Dwarf_Error error = nullptr;
     int result;
     result = dwarf_formref(info.dw_attr, &ref_value.return_offset, &ref_value.is_info, &info.dw_error);
     if (result != DW_DLV_OK) {
@@ -126,7 +125,6 @@ std::optional<DW_FORM_ref_result_t> get_DW_FORM_ref(dwarf_analyze_info &info) {
 // DW_FORM_sec_offset
 std::optional<DW_FORM_ref_result_t> get_DW_FORM_sec_offset(dwarf_analyze_info &info) {
     DW_FORM_ref_result_t ref_value;
-    Dwarf_Error error = nullptr;
     int result;
     result = dwarf_global_formref_b(info.dw_attr, &ref_value.return_offset, &ref_value.is_info, &info.dw_error);
     if (result != DW_DLV_OK) {
@@ -140,7 +138,6 @@ template <typename T, typename ReturnT = std::optional<T>>
 ReturnT get_DW_FORM_exprloc(dwarf_analyze_info &info) {
     Dwarf_Unsigned return_exprlen = 0;
     Dwarf_Ptr block_ptr           = nullptr;
-    Dwarf_Error error             = nullptr;
     int result;
     result = dwarf_formexprloc(info.dw_attr, &return_exprlen, &block_ptr, &info.dw_error);
     if (result != DW_DLV_OK) {
@@ -158,7 +155,6 @@ ReturnT get_DW_FORM_exprloc(dwarf_analyze_info &info) {
 template <typename T, typename ReturnT = std::optional<T>>
 ReturnT get_DW_FORM(dwarf_analyze_info &info) {
     Dwarf_Half form;
-    Dwarf_Error error = nullptr;
     int result;
     // form形式を取得
     result = dwarf_whatform(info.dw_attr, &form, &info.dw_error);

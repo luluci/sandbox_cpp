@@ -3,7 +3,9 @@
 #include <iostream>
 #include <string>
 
+#include "util_dwarf/debug_info.hpp"
 #include "util_dwarf/dwarf_analyzer.hpp"
+#include "util_dwarf/dwarf_info.hpp"
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
@@ -26,6 +28,8 @@ int main(int argc, char *argv[]) {
         printf("%f\n", (double)(t - s) / CLOCKS_PER_SEC);
 
         //
+        auto debug_info = util_dwarf::debug_info(dw_info);
+        debug_info.build();
 
         di.close();
     }
