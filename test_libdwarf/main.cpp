@@ -88,9 +88,7 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
             printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
             // member
             if (type.child_list != nullptr) {
-                for (auto &mem : *type.child_list) {
-                    dump_memmap_member(type, name, depth, addr);
-                }
+                dump_memmap_member(type, name, depth, addr);
             }
         }
 
@@ -121,13 +119,14 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
             if ((member.tag & util_dwarf::debug_info::type_tag::array) != 0) {
                 for (size_t i = 0; i < type.count; i++) {
                     //
+                    address += type.byte_size;
                     name = std::format("{}.{}[{}]", prefix, *(member.name), i);
-                    printf("0x%08X\t%20s\t%lld\t%*c%s\n", address, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
+                    printf("0x%08X\t%20s\t%lld\t%*c%s\n", address, tag.c_str(), member.byte_size, depth, '\t', name.c_str());
                 }
             } else {
                 //
                 name = std::format("{}.{}", prefix, *(member.name));
-                printf("0x%08X\t%20s\t%lld\t%*c%s\n", address, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
+                printf("0x%08X\t%20s\t%lld\t%*c%s\n", address, tag.c_str(), member.byte_size, depth, '\t', name.c_str());
             }
 
         } else {
@@ -137,7 +136,7 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
             //
             name = std::format("{}.{}", prefix, *(member.name));
             //
-            printf("0x%08X\t%20s\t%lld bit\t%*c%s\n", address, tag.c_str(), type.bit_size, depth, '\t', name.c_str());
+            printf("0x%08X\t%20s\t%lld bit\t%*c%s\n", address, tag.c_str(), member.bit_size, depth, '\t', name.c_str());
         }
     }
 }
