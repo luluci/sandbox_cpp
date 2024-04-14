@@ -559,7 +559,11 @@ public:
         }
     };
 
+    bool lookup_ctrl_not_expand_array;
+
     void get_var_info(std::function<bool(var_info_view &)> &&func) {
+        lookup_ctrl_not_expand_array = true;
+
         std::string prefix = "";
 
         // global_varをすべてチェック
@@ -607,7 +611,6 @@ private:
         } else {
             address = 0;
         }
-        //
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
@@ -686,7 +689,6 @@ private:
         view.bit_offset = 0;
         view.bit_size   = 0;
 
-        // printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
         // コールバック
         cb_result = func(view);
         if (!cb_result) {
@@ -715,13 +717,14 @@ private:
             std::format_to(std::back_inserter(var_name), "{}.{}", prefix, *tag_name_org);
         }
         view.tag_name = &var_name;
+        // アドレス計算
+        view.address = address;
 
         view.is_bitfield = true;
         view.byte_size   = 0;
         view.bit_offset  = bit_offset;
         view.bit_size    = type.bit_size;
 
-        // printf("0x%08X\t%20s\t%lld bit\t%*c%s\n", address, tag.c_str(), member.bit_size, depth, '\t', name.c_str());
         // コールバック
         cb_result = func(view);
         if (!cb_result) {
@@ -738,10 +741,18 @@ private:
         for (size_t i = 0; i < type.count; i++) {
             // 表示名作成
             var_name.clear();
-            if (prefix.size() == 0) {
-                std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, i);
+            if (lookup_ctrl_not_expand_array) {
+                if (prefix.size() == 0) {
+                    std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, type.count);
+                } else {
+                    std::format_to(std::back_inserter(var_name), "{}.{}[{}]", prefix, *tag_name_org, type.count);
+                }
             } else {
-                std::format_to(std::back_inserter(var_name), "{}.{}[{}]", prefix, *tag_name_org, i);
+                if (prefix.size() == 0) {
+                    std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, i);
+                } else {
+                    std::format_to(std::back_inserter(var_name), "{}.{}[{}]", prefix, *tag_name_org, i);
+                }
             }
             view.tag_name = &var_name;
             // アドレス計算
@@ -752,7 +763,6 @@ private:
             view.bit_offset = 0;
             view.bit_size   = 0;
 
-            // printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
             // コールバック
             cb_result = func(view);
             if (!cb_result) {
@@ -761,6 +771,9 @@ private:
 
             //  member check
             lookup_var_member(type, view.address, var_name, depth + 1, std::forward<Func>(func));
+
+            if (lookup_ctrl_not_expand_array)
+                break;
         }
 
         // 念のため
