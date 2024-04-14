@@ -136,7 +136,6 @@ private:
         return &(it2->second);
     }
 
-private:
     void build_type_info(type_info &dbg_info, Dwarf_Unsigned offset) {
         auto &dw_type_map = dw_info_.type_tbl.type_map;
         // 開始ノード存在チェック
@@ -155,6 +154,9 @@ private:
             // 再帰呼び出しになるので注意
             auto child_info = get_type_info(*(root_dw_info.type));
             dbg_info        = *child_info;
+            if (dbg_info.sub_info == nullptr) {
+                dbg_info.sub_info = child_info;
+            }
         }
         // type_infoに今回対象となるoffsetの情報を適用する
         adapt_info(dbg_info, root_dw_info);
@@ -241,14 +243,17 @@ private:
             }
         }
         // arrayケア
-        if ((dbg_info.tag & type_tag::array) == type_tag::array) {
-            // arrayに関するデータをマスクしたデータが要素型のデータになる
-            sub_type_list.push_back(dbg_info);
-            auto &sub_type    = sub_type_list.back();
-            dbg_info.sub_info = &sub_type;
-            //
-            sub_type.tag &= ~(type_tag::array);
-            sub_type.count = 0;
+        if (dbg_info.sub_info == nullptr) {
+            if ((dbg_info.tag & type_tag::array) == type_tag::array) {
+                // arrayに関するデータをマスクしたデータが要素型のデータになる
+                sub_type_list.push_back(dbg_info);
+                auto &sub_type    = sub_type_list.back();
+                dbg_info.sub_info = &sub_type;
+                //
+                sub_type.byte_size = sub_type.byte_size / sub_type.count;
+                sub_type.count     = 0;
+                sub_type.tag &= ~(type_tag::array);
+            }
         }
     }
 
@@ -296,7 +301,7 @@ private:
 
     void adapt_info_typedef(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
-        adapt_value(dbg_info.name, dw_info.name);
+        adapt_value_force(dbg_info.name, dw_info.name);
         //
         dbg_info.tag |= dw_info.tag;
     }

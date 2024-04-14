@@ -601,7 +601,7 @@ private:
     }
     void analyze_DW_TAG_union_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // structとunionがほぼ同じなので共通処理にする
-        analyze_DW_TAG_struct_union<DW_TAG_union_type>(die, dw_info, die_info, type_tag::struct_);
+        analyze_DW_TAG_struct_union<DW_TAG_union_type>(die, dw_info, die_info, type_tag::union_);
     }
 
     template <size_t DW_TAG>
