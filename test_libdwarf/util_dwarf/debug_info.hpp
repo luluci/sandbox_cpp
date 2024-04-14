@@ -559,6 +559,16 @@ public:
         }
     };
 
+    struct lookup_mode
+    {
+        using type = uint32_t;
+
+        enum mode
+        {
+            not_expand_array,
+        };
+    };
+
     bool lookup_ctrl_not_expand_array;
 
     void get_var_info(std::function<bool(var_info_view &)> &&func) {
@@ -700,7 +710,7 @@ private:
     }
 
     template <typename Func>
-    void lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+    void lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t /*depth*/, Func &&func) {
         auto tag_name_org = view.tag_name;
         std::string var_name;
         bool cb_result;

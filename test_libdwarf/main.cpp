@@ -1,4 +1,6 @@
 
+#include <time.h>
+
 #include <cstdio>
 #include <format>
 #include <iostream>
@@ -48,7 +50,7 @@ std::string dump_make_tag(util_dwarf::debug_info::type_info &type) {
     }
 
     //
-    return std::move(tag);
+    return tag;
 }
 
 template <typename Func>
@@ -197,7 +199,7 @@ int main(int argc, char *argv[]) {
         // dwarf解析
         di.analyze(dw_info);
         t = clock();
-        printf("%f\n", (double)(t - s) / CLOCKS_PER_SEC);
+        printf("%f\n", static_cast<double>(t - s) / CLOCKS_PER_SEC);
 
         //
         auto debug_info = util_dwarf::debug_info(dw_info);
@@ -218,7 +220,7 @@ int main(int argc, char *argv[]) {
         //     return;
         // });
         debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
-            printf("0x%08X\t%20s\t%lld\t%s\n", view.address, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
+            printf("0x%08llX\t%20s\t%lld\t%s\n", view.address, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
 
             return true;
         });

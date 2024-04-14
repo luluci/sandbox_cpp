@@ -144,7 +144,7 @@ ReturnT get_DW_FORM_exprloc(dwarf_analyze_info &info) {
         utility::error_happen(&info.dw_error);
         return std::nullopt;
     }
-    info.dw_expr.eval((uint8_t *)block_ptr, return_exprlen);
+    info.dw_expr.eval(static_cast<uint8_t *>(block_ptr), return_exprlen);
     auto eval = info.dw_expr.pop();
     if (eval) {
         return ReturnT(*eval);

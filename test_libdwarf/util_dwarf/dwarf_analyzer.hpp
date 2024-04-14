@@ -47,7 +47,8 @@ private:
 
     static void err_handler(Dwarf_Error error, Dwarf_Ptr dw_errarg) {
         char *errmsg = dwarf_errmsg(error);
-        printf("%s\n", errmsg);
+        printf("errmsg: %s\n", errmsg);
+        printf("errarg: (0x%p)\n", dw_errarg);
         throw std::runtime_error("libdwarf API error!");
         exit(1);  // 一応書いておく
     }
@@ -85,7 +86,7 @@ public:
 
         auto result = dwarf_init_path(dwarf_file_path.c_str(), dw_true_path_buff, dw_true_path_buff_len, dw_groupnumber, err_handler, dw_errarg,
                                       &dw_dbg, &dw_error);
-        printf("dwarf_init_path : result : %d\n", result);
+        // printf("dwarf_init_path : result : %d\n", result);
         if (result == DW_DLV_NO_ENTRY) {
             // 情報なし？
             return false;
@@ -327,7 +328,7 @@ private:
             } else {
                 propernumber = i + 1;
             }
-            printf("File %4ld %s\n", (unsigned long)propernumber, srcfiles[i]);
+            printf("File %4ld %s\n", static_cast<unsigned long>(propernumber), srcfiles[i]);
             dwarf_dealloc(dw_dbg, srcfiles[i], DW_DLA_STRING);
             srcfiles[i] = 0;
         }
@@ -501,7 +502,7 @@ private:
     void analyze_die_TAG_compile_unit(Dwarf_Die, dwarf_info &) {
     }
 
-    void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
+    void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t & /*die_info*/) {
         // 変数情報作成
         auto info = dw_info.global_var_tbl.make_new_var_info();
         analyze_DW_AT<DW_TAG_variable>(die, analyze_info_, *info);
@@ -717,7 +718,7 @@ private:
         }
     }
 
-    void analyze_DW_TAG_array_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &parent_die_info, type_info &parent_type) {
+    void analyze_DW_TAG_array_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t & /*parent_die_info*/, type_info &parent_type) {
         int result;
         Dwarf_Half tag;
         result = dwarf_tag(die, &tag, &dw_error);
