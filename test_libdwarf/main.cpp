@@ -73,6 +73,10 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
     Dwarf_Off addr;
     //
     std::string name;
+    //
+    if (var.decl_file_is_external) {
+        return;
+    }
 
     // data
     if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
@@ -87,8 +91,12 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
             addr   = *var.location + offset;
             printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
             // member
-            if (type.child_list != nullptr) {
-                dump_memmap_member(type, name, depth, addr);
+            // pointerは展開しない
+            // function: 引数としてchildを持つ -> 展開しない
+            if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
+                if (type.child_list != nullptr) {
+                    dump_memmap_member(type, name, depth, addr);
+                }
             }
         }
 
@@ -98,8 +106,17 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
         } else {
             name = prefix + "." + var.name;
         }
+        addr = *var.location;
         // 配列以外
-        printf("0x%08X\t%20s\t%lld\t%*c%s\n", *var.location, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
+        printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
+        // member
+        // pointerは展開しない
+        // function: 引数としてchildを持つ -> 展開しない
+        if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
+            if (type.child_list != nullptr) {
+                dump_memmap_member(type, name, depth, addr);
+            }
+        }
     }
 }
 void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &prefix, int depth, Dwarf_Off base_address) {
@@ -122,11 +139,19 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
         if (member.bit_size == 0) {
             // bit_sizeがゼロならビットフィールドでない
             if ((member.tag & util_dwarf::debug_info::type_tag::array) != 0) {
-                for (size_t i = 0; i < type.count; i++) {
+                for (size_t i = 0; i < member.count; i++) {
                     //
                     address += type.byte_size;
                     name = std::format("{}.{}[{}]", prefix, *(member.name), i);
                     printf("0x%08X\t%20s\t%lld\t%*c%s\n", address, tag.c_str(), member.byte_size, depth, '\t', name.c_str());
+                    // member
+                    // pointerは展開しない
+                    // function: 引数としてchildを持つ -> 展開しない
+                    if ((member.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
+                        if (member.child_list != nullptr) {
+                            dump_memmap_member(member, name, depth, address);
+                        }
+                    }
                 }
             } else {
                 //
