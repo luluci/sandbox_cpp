@@ -212,6 +212,14 @@ private:
                 adapt_info_member(dbg_info, dw_info);
                 break;
 
+            case type_tag::reference:
+                adapt_info_reference(dbg_info, dw_info);
+                break;
+
+            case type_tag::parameter:
+                adapt_info_parameter(dbg_info, dw_info);
+                break;
+
             default:
                 // 実装忘れ
                 printf("no impl : build_node : 0x%02X\n", dw_info.tag);
@@ -290,11 +298,33 @@ private:
         dbg_info.tag |= dw_info.tag;
     }
 
+    void adapt_info_reference(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // 対象データが空ならdw_infoを反映する
+        adapt_value(dbg_info.name, dw_info.name);
+        //
+        if (dw_info.type) {
+            dbg_info.sub_info = get_type_info(*dw_info.type);
+        }
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
     void adapt_info_func(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         //
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
         adapt_value(dbg_info.child_list, dw_info.child_list);
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_parameter(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        //
+        adapt_value(dbg_info.name, dw_info.name);
+        //
+        if (dw_info.type) {
+            dbg_info.sub_info = get_type_info(*dw_info.type);
+        }
         //
         dbg_info.tag |= dw_info.tag;
     }
