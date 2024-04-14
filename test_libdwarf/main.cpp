@@ -12,9 +12,31 @@
 // void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::type_info &type, std::string &prefix, int depth, size_t array_idx);
 // void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &prefix, int depth, Dwarf_Off address);
 
+static constexpr size_t make_type_tag_buff_size = 100;
+char make_type_tag_buff[make_type_tag_buff_size];
 std::string dump_make_tag(util_dwarf::debug_info::type_info &type) {
     // type name
     std::string tag;
+
+    // pointer情報を作成
+    size_t i;
+    for (i = 0; i < make_type_tag_buff_size - 1 && i < type.pointer_depth; i++) {
+        make_type_tag_buff[i] = '*';
+    }
+    make_type_tag_buff[i] = '\0';
+    // // type情報タグを作成
+    // if (type.name != nullptr) {
+    //     view.tag_type = type.name;
+    //     if ((type.tag & util_dwarf::debug_info::type_tag::struct_) != 0) {
+    //         view.is_struct = true;
+    //         std::format_to(std::back_inserter(view.tag_type), "struct/{}{}", *type.name, make_type_tag_buff);
+    //     } else if ((type.tag & util_dwarf::debug_info::type_tag::union_) != 0) {
+    //         view.is_union = true;
+    //         std::format_to(std::back_inserter(view.tag_type), "union/{}{}", *type.name, make_type_tag_buff);
+    //     } else {
+    //         std::format_to(std::back_inserter(view.tag_type), "{}{}", *type.name, make_type_tag_buff);
+    //     }
+    // }
     if (type.name != nullptr) {
         if ((type.tag & util_dwarf::debug_info::type_tag::struct_) != 0) {
             tag = std::format("struct/{}", *type.name);
@@ -24,9 +46,7 @@ std::string dump_make_tag(util_dwarf::debug_info::type_info &type) {
             tag = std::format("{}", *type.name);
         }
     }
-    if (type.pointer_depth > 0) {
-        tag = std::format("{}*", tag);
-    }
+
     //
     return std::move(tag);
 }
@@ -52,9 +72,9 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
         // 配列, ポインタは含まない
         for (size_t i = 0; i < type.count; i++) {
             if (prefix.size() == 0) {
-                name = std::format("{}[{}]", var.name, i);
+                name = std::format("{}[{}]", *var.name, i);
             } else {
-                name = std::format("{}.{}[{}]", prefix, var.name, i);
+                name = std::format("{}.{}[{}]", prefix, *var.name, i);
             }
             offset = i * type.byte_size;
             addr   = *var.location + offset;
@@ -74,9 +94,9 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
 
     } else {
         if (prefix.size() == 0) {
-            name = var.name;
+            name = *var.name;
         } else {
-            name = prefix + "." + var.name;
+            name = prefix + "." + *var.name;
         }
         addr = *var.location;
         // 配列以外
@@ -183,19 +203,24 @@ int main(int argc, char *argv[]) {
         auto debug_info = util_dwarf::debug_info(dw_info);
         debug_info.build();
         //
-        debug_info.memmap([](util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::type_info &type) -> void {
-            std::string prefix("");
-            dump_memmap(var, type, prefix, 0, 0, [](auto &var1, auto &type1) -> void {
-                // if constexpr (std::is_pointer_v<decltype(var1.name)>) {
-                //     if (var1.name == nullptr) {
-                //         return;
-                //     }
-                //     printf("var:%s, type:%s\n", var1.name->c_str(), type1.name->c_str());
-                // } else {
-                //     printf("var:%s, type:%s\n", var1.name.c_str(), type1.name->c_str());
-                // }
-            });
-            return;
+        // debug_info.memmap([](util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::type_info &type) -> void {
+        //     std::string prefix("");
+        //     dump_memmap(var, type, prefix, 0, 0, [](auto &var1, auto &type1) -> void {
+        //         // if constexpr (std::is_pointer_v<decltype(var1.name)>) {
+        //         //     if (var1.name == nullptr) {
+        //         //         return;
+        //         //     }
+        //         //     printf("var:%s, type:%s\n", var1.name->c_str(), type1.name->c_str());
+        //         // } else {
+        //         //     printf("var:%s, type:%s\n", var1.name.c_str(), type1.name->c_str());
+        //         // }
+        //     });
+        //     return;
+        // });
+        debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
+            printf("0x%08X\t%20s\t%lld\t%s\n", view.address, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
+
+            return true;
         });
 
         di.close();

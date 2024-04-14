@@ -5,7 +5,9 @@
 #include <libdwarf.h>
 
 #include <algorithm>
+#include <format>
 #include <functional>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,55 @@ namespace util_dwarf {
 class debug_info {
 public:
     using type_tag = dwarf_info::type_tag;
+
+    struct var_info
+    {
+        std::string *name;
+        bool external;
+        Dwarf_Unsigned decl_file;  // filelistのインデックス
+        bool decl_file_is_external;
+        Dwarf_Unsigned decl_line;
+        Dwarf_Unsigned decl_column;
+        bool declaration;  // 不完全型のときtrue
+        Dwarf_Unsigned const_value;
+        Dwarf_Unsigned sibling;
+        Dwarf_Unsigned endianity;  // DW_END_*
+        std::optional<Dwarf_Off> location;
+        std::optional<Dwarf_Off> type;  // reference
+
+        var_info()
+            : name(nullptr),
+              external(false),
+              decl_file(0),
+              decl_file_is_external(false),
+              decl_line(0),
+              decl_column(0),
+              declaration(false),
+              const_value(0),
+              sibling(0),
+              endianity(0),
+              location(),
+              type() {
+        }
+
+        void copy(dwarf_info::var_info &info) {
+            // dwarf_infoから必要な情報をコピーする
+            name                  = &(info.name);
+            external              = info.external;
+            decl_file             = info.decl_file;
+            decl_file_is_external = info.decl_file_is_external;
+            decl_line             = info.decl_line;
+            decl_column           = info.decl_column;
+            declaration           = info.declaration;
+            const_value           = info.const_value;
+            sibling               = info.sibling;
+            endianity             = info.endianity;
+            if (info.type)
+                type = *info.type;
+            if (info.location)
+                location = *info.location;
+        }
+    };
 
     // dwarf_info::type_infoを集約した型情報
     struct type_info
@@ -67,8 +118,10 @@ public:
     };
 
     // 変数情報
-    using var_info = dwarf_info::var_info;
-    std::vector<var_info *> global_var_tbl;
+    // using var_info = dwarf_info::var_info;
+    using var_list_node_t = std::unique_ptr<var_info>;
+    using var_list_t      = std::vector<var_list_node_t>;
+    var_list_t global_var_tbl;
     // 型情報
     using type_map_t = std::map<Dwarf_Unsigned, type_info>;
     type_map_t type_map;
@@ -82,11 +135,49 @@ private:
     dwarf_info &dw_info_;
 
 public:
-    debug_info(dwarf_info &dw_info) : dw_info_(dw_info), name_void("void") {
+    debug_info(dwarf_info &dw_info) : name_void("void"), dw_info_(dw_info) {
         global_var_tbl.reserve(dw_info.global_var_tbl.var_list.size());
     }
 
     void build() {
+        build_var_info();
+        build_type_info();
+    }
+    void build_var_info() {
+        // ソート用に変数リストへのポインタをリストアップする
+        auto &dw_var_list = dw_info_.global_var_tbl.var_list;
+        for (auto &elem : dw_var_list) {
+            // dwarf_infoからデータコピー
+            auto info = std::make_unique<var_info>();
+            info->copy(*elem);
+            // list追加
+            global_var_tbl.push_back(std::move(info));
+        }
+        // ソートする
+        std::sort(global_var_tbl.begin(), global_var_tbl.end(), [](auto &a, auto &b) -> bool {
+            if (!a->location) {
+                return true;
+            } else if (!b->location) {
+                return false;
+            } else {
+                return a->location < b->location;
+            }
+        });
+        // checkする
+        bool is_del;
+        for (auto it = global_var_tbl.begin(); it != global_var_tbl.end(); it++) {
+            is_del = false;
+            // 削除対象をチェック
+            if ((*it)->decl_file_is_external) {
+                is_del = true;
+            }
+            // 削除
+            if (is_del) {
+                it = global_var_tbl.erase(it);
+            }
+        }
+    }
+    void build_type_info() {
         // DIEから収集したデータは木構造で情報が分散している
         // ルートオブジェクトに情報を集約して型情報を単一にする
         auto &dw_type_map = dw_info_.type_tbl.type_map;
@@ -94,16 +185,8 @@ public:
         for (auto &elem : dw_type_map) {
             // 集約ノード取得
             // ダミー取得をして情報の作成を行う
-            auto dbg_info = get_type_info(elem.first);
+            get_type_info(elem.first);
         }
-
-        // ソート用に変数リストへのポインタをリストアップする
-        auto &var_list = dw_info_.global_var_tbl.var_list;
-        for (auto &elem : var_list) {
-            global_var_tbl.push_back(elem.get());
-        }
-        // ソートする
-        std::sort(global_var_tbl.begin(), global_var_tbl.end(), [](var_info *a, var_info *b) { return a->location < b->location; });
     }
 
     void memmap(std::function<void(var_info &, type_info &)> &&func) {
@@ -438,6 +521,250 @@ private:
         if (dst == 0 && src) {
             dst = *src;
         }
+    }
+
+public:
+    struct var_info_view
+    {
+        std::string *tag_type;
+        std::string *tag_name;
+
+        Dwarf_Off address;
+        Dwarf_Unsigned byte_size;
+        Dwarf_Unsigned bit_offset;
+        Dwarf_Unsigned bit_size;
+        Dwarf_Unsigned data_bit_offset;
+        Dwarf_Off data_member_location;
+
+        size_t pointer_depth;
+        bool is_struct;
+        bool is_union;
+        bool is_array;
+        bool is_bitfield;
+
+        var_info_view()
+            : tag_type(nullptr),
+              tag_name(nullptr),
+              address(0),
+              byte_size(0),
+              bit_offset(0),
+              bit_size(0),
+              data_bit_offset(0),
+              data_member_location(0),
+              pointer_depth(0),
+              is_struct(false),
+              is_union(false),
+              is_array(false),
+              is_bitfield(false) {
+        }
+    };
+
+    void get_var_info(std::function<bool(var_info_view &)> &&func) {
+        std::string prefix = "";
+
+        // global_varをすべてチェック
+        for (auto &var : global_var_tbl) {
+            // 対応するtypeを取得
+            if (var->type) {
+                auto it = type_map.find(*(var->type));
+                if (it != type_map.end()) {
+                    lookup_var(*var, it->second, prefix, 0, func);
+                }
+            }
+        }
+    }
+
+private:
+    void make_type_tag(var_info_view &view, type_info &type) {
+        // pointer
+        view.pointer_depth = type.pointer_depth;
+        // type情報タグを作成
+        if (type.name != nullptr) {
+            view.tag_type = type.name;
+            if ((type.tag & util_dwarf::debug_info::type_tag::struct_) != 0) {
+                view.is_struct = true;
+            } else if ((type.tag & util_dwarf::debug_info::type_tag::union_) != 0) {
+                view.is_union = true;
+            } else {
+                //
+            }
+        } else {
+            // ありえない
+            view.tag_type = &name_void;
+        }
+    }
+
+    template <typename Func>
+    void lookup_var(var_info &var, type_info &type, std::string &prefix, size_t depth, Func &&func) {
+        var_info_view view;
+        Dwarf_Off address;
+        // 型タグ作成
+        make_type_tag(view, type);
+        // 変数情報
+        view.tag_name = var.name;
+        if (var.location) {
+            address = *var.location;
+        } else {
+            address = 0;
+        }
+        //
+
+        if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
+            // 配列のとき
+            lookup_var_impl_array(view, type, address, prefix, depth, std::forward<Func>(func));
+        } else {
+            // 配列以外のとき
+            lookup_var_impl_default(view, type, address, prefix, depth, std::forward<Func>(func));
+        }
+    }
+
+    template <typename Func>
+    void lookup_var_member(type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+        //  pointerは展開しない
+        //  function: 引数としてchildを持つ -> 展開しない
+        if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) != 0) {
+            return;
+        }
+        if (type.child_list == nullptr) {
+            return;
+        }
+
+        for (auto &mem : *type.child_list) {
+            // memberが変数名になる
+            auto &member = *mem;
+            // memberのchild要素がmemberの型情報を示しているはず
+            type_info *member_type = &(*mem);
+            if (member.sub_info != nullptr) {
+                member_type = member.sub_info;
+            }
+            // member毎処理
+            lookup_var_member_each(member, *member_type, base_address, prefix, depth, std::forward<Func>(func));
+        }
+    }
+    template <typename Func>
+    void lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+        Dwarf_Off address;
+        var_info_view view;
+        // 型タグ作成
+        make_type_tag(view, type);
+        // 変数情報
+        view.tag_name = member.name;
+        address       = base_address + member.data_member_location;
+
+        if (member.bit_size == 0) {
+            // bit_sizeがゼロならビットフィールドでない
+            if ((member.tag & util_dwarf::debug_info::type_tag::array) != 0) {
+                lookup_var_impl_array(view, member, address, prefix, depth, std::forward<Func>(func));
+            } else {
+                lookup_var_impl_default(view, member, address, prefix, depth, std::forward<Func>(func));
+            }
+
+        } else {
+            // bit_sizeがゼロ以外ならビットフィールド
+            lookup_var_impl_bitfield(view, member, address, prefix, depth, std::forward<Func>(func));
+        }
+    }
+
+    template <typename Func>
+    void lookup_var_impl_default(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+        auto tag_name_org = view.tag_name;
+        std::string var_name;
+        bool cb_result;
+
+        // 表示名作成
+        if (prefix.size() == 0) {
+            std::format_to(std::back_inserter(var_name), "{}", *tag_name_org);
+        } else {
+            std::format_to(std::back_inserter(var_name), "{}.{}", prefix, *tag_name_org);
+        }
+        view.tag_name = &var_name;
+        // アドレス計算
+        view.address = base_address;
+        //
+        view.is_array   = true;
+        view.byte_size  = type.byte_size;
+        view.bit_offset = 0;
+        view.bit_size   = 0;
+
+        // printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
+        // コールバック
+        cb_result = func(view);
+        if (!cb_result) {
+            return;
+        }
+
+        //  member check
+        lookup_var_member(type, view.address, var_name, depth + 1, std::forward<Func>(func));
+    }
+
+    template <typename Func>
+    void lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+        auto tag_name_org = view.tag_name;
+        std::string var_name;
+        bool cb_result;
+        Dwarf_Off address;
+        Dwarf_Unsigned bit_offset;
+
+        address    = base_address + (type.bit_offset / 8);
+        bit_offset = type.bit_offset % 8;
+
+        // 表示名作成
+        if (prefix.size() == 0) {
+            std::format_to(std::back_inserter(var_name), "{}", *tag_name_org);
+        } else {
+            std::format_to(std::back_inserter(var_name), "{}.{}", prefix, *tag_name_org);
+        }
+        view.tag_name = &var_name;
+
+        view.is_bitfield = true;
+        view.byte_size   = 0;
+        view.bit_offset  = bit_offset;
+        view.bit_size    = type.bit_size;
+
+        // printf("0x%08X\t%20s\t%lld bit\t%*c%s\n", address, tag.c_str(), member.bit_size, depth, '\t', name.c_str());
+        // コールバック
+        cb_result = func(view);
+        if (!cb_result) {
+            return;
+        }
+    }
+
+    template <typename Func>
+    void lookup_var_impl_array(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+        auto tag_name_org = view.tag_name;
+        std::string var_name;
+        bool cb_result;
+
+        for (size_t i = 0; i < type.count; i++) {
+            // 表示名作成
+            var_name.clear();
+            if (prefix.size() == 0) {
+                std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, i);
+            } else {
+                std::format_to(std::back_inserter(var_name), "{}.{}[{}]", prefix, *tag_name_org, i);
+            }
+            view.tag_name = &var_name;
+            // アドレス計算
+            view.address = base_address + (i * type.byte_size);
+            //
+            view.is_array   = true;
+            view.byte_size  = type.byte_size;
+            view.bit_offset = 0;
+            view.bit_size   = 0;
+
+            // printf("0x%08X\t%20s\t%lld\t%*c%s\n", addr, tag.c_str(), type.byte_size, depth, '\t', name.c_str());
+            // コールバック
+            cb_result = func(view);
+            if (!cb_result) {
+                break;
+            }
+
+            //  member check
+            lookup_var_member(type, view.address, var_name, depth + 1, std::forward<Func>(func));
+        }
+
+        // 念のため
+        view.tag_name = tag_name_org;
     }
 };
 
