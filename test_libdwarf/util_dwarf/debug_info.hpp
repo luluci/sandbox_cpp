@@ -396,8 +396,37 @@ private:
     }
 
     void adapt_info_func(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // 関数ポインタ型名前作成
+        if (dw_info.name.size() > 0) {
+            // 関数ポインタ型名称を優先
+            // adapt_value(dbg_info.name, dw_info.name);
+        } else {
+            auto inserter = std::back_inserter(dw_info.name);
+            // 返り値型適用
+            if (dbg_info.name == nullptr) {
+                std::format_to(inserter, "void");
+            } else {
+                std::format_to(inserter, "{}", *dbg_info.name);
+            }
+            // 関数ポインタ表示
+            std::format_to(inserter, "(*)(");
+            // 引数型
+            auto it = dw_info.child_list.begin();
+            if (it != dw_info.child_list.end()) {
+                auto &param    = *it;
+                auto dbg_param = get_type_info(param->offset);
+                std::format_to(inserter, "{}", *dbg_param->name);
+                it++;
+            }
+            for (; it != dw_info.child_list.end(); it++) {
+                auto &param    = *it;
+                auto dbg_param = get_type_info(param->offset);
+                std::format_to(inserter, ", {}", *dbg_param->name);
+            }
+            std::format_to(inserter, ")");
+        }
+        dbg_info.name = &dw_info.name;
         //
-        adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
         adapt_value(dbg_info.child_list, dw_info.child_list);
         //
@@ -461,6 +490,21 @@ private:
         }
         // ダブルポインタとかのケア
         dbg_info.pointer_depth++;
+        // name作成
+        if (dw_info.name.size() > 0) {
+            dbg_info.name = &dw_info.name;
+        } else {
+            if ((dbg_info.tag & type_tag::func) == 0) {
+                auto it = std::back_inserter(dw_info.name);
+                if (dbg_info.name == nullptr) {
+                    std::format_to(it, "void");
+                } else {
+                    std::format_to(it, "{}", *dbg_info.name);
+                }
+                std::format_to(it, "*");
+                dbg_info.name = &dw_info.name;
+            }
+        }
 
         //
         dbg_info.tag |= dw_info.tag;
@@ -497,7 +541,7 @@ private:
     }
 
     void adapt_value(std::optional<Dwarf_Off> &dst, std::optional<Dwarf_Off> &src) {
-        if (src) {
+        if (!dst && src) {
             dst = *src;
         }
     }
@@ -537,6 +581,7 @@ public:
         Dwarf_Unsigned bit_offset;
         Dwarf_Unsigned bit_size;
         Dwarf_Unsigned data_bit_offset;
+        Dwarf_Unsigned encoding;  // DW_ATE_*
         Dwarf_Off data_member_location;
 
         size_t pointer_depth;
@@ -553,6 +598,7 @@ public:
               bit_offset(0),
               bit_size(0),
               data_bit_offset(0),
+              encoding(0),
               data_member_location(0),
               pointer_depth(0),
               is_struct(false),
@@ -609,6 +655,8 @@ private:
             // ありえない
             view.tag_type = &name_void;
         }
+        //
+        view.encoding = type.encoding;
     }
 
     template <typename Func>
