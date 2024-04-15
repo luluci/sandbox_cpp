@@ -649,6 +649,10 @@ private:
                 analyze_DW_TAG_array_type(die, dw_info, die_info);
                 return;
 
+            case DW_TAG_subroutine_type:
+                analyze_DW_TAG_subroutine_type(die, dw_info, die_info);
+                return;
+
             case DW_TAG_reference_type:
                 analyze_DW_TAG_reference_type(die, dw_info, die_info);
                 return;

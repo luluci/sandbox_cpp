@@ -165,7 +165,8 @@ public:
         });
         // checkする
         bool is_del;
-        for (auto it = global_var_tbl.begin(); it != global_var_tbl.end(); it++) {
+        auto it = global_var_tbl.begin();
+        while (it != global_var_tbl.end()) {
             is_del = false;
             // 削除対象をチェック
             if ((*it)->decl_file_is_external) {
@@ -174,6 +175,8 @@ public:
             // 削除
             if (is_del) {
                 it = global_var_tbl.erase(it);
+            } else {
+                it++;
             }
         }
     }
