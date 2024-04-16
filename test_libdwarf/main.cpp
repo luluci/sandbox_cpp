@@ -197,12 +197,19 @@ int main(int argc, char *argv[]) {
         clock_t s, t;
         s = clock();
         // dwarf解析
+        using analyze_opt = util_dwarf::dwarf_analyzer::option;
+        analyze_opt anlz_opt(analyze_opt::off_func_info_analyze | analyze_opt::on_no_impl_warning);
         di.analyze(dw_info);
         t = clock();
         printf("%f\n", static_cast<double>(t - s) / CLOCKS_PER_SEC);
 
         //
-        auto debug_info = util_dwarf::debug_info(dw_info);
+        using diopt = util_dwarf::debug_info::option;
+        diopt opt;
+        // opt.set(diopt::through_typedef | diopt::expand_array);
+        opt.unset(diopt::through_typedef);
+        // opt.unset(diopt::expand_array);
+        auto debug_info = util_dwarf::debug_info(dw_info, opt);
         debug_info.build();
         //
         // debug_info.memmap([](util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::type_info &type) -> void {
@@ -220,7 +227,7 @@ int main(int argc, char *argv[]) {
         //     return;
         // });
         debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
-            printf("0x%08llX\t%20s\t%lld\t%s\n", view.address, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
+            printf("0x%08llX  %25s\t%lld\t%s\n", view.address, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
 
             return true;
         });

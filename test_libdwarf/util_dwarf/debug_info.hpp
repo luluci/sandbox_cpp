@@ -17,6 +17,47 @@ namespace util_dwarf {
 
 class debug_info {
 public:
+    struct option
+    {
+        using type = uint32_t;
+
+        enum mode : type
+        {
+            none,
+            through_typedef = 1 << 0,
+            expand_array    = 1 << 1,
+        };
+
+        bool is_through_typedef;
+        bool is_expand_array;
+
+        option(type flags = none) : is_through_typedef(true), is_expand_array(false) {
+            set(flags);
+        }
+
+        void set(type flags) {
+            set_impl(flags, true);
+        }
+        void unset(type flags) {
+            set_impl(flags, false);
+        }
+
+    private:
+        void set_impl(type flags, bool value) {
+            if (check_flag(flags, through_typedef)) {
+                is_through_typedef = value;
+            }
+            if (check_flag(flags, expand_array)) {
+                is_expand_array = value;
+            }
+        }
+
+        bool check_flag(type flags, mode flag) {
+            return ((flags & flag) == flag);
+        }
+    };
+
+public:
     using type_tag = dwarf_info::type_tag;
 
     struct var_info
@@ -134,8 +175,11 @@ public:
 private:
     dwarf_info &dw_info_;
 
+    // option
+    option opt_;
+
 public:
-    debug_info(dwarf_info &dw_info) : name_void("void"), dw_info_(dw_info) {
+    debug_info(dwarf_info &dw_info, option opt) : name_void("void"), dw_info_(dw_info), opt_(opt) {
         global_var_tbl.reserve(dw_info.global_var_tbl.var_list.size());
     }
 
@@ -361,6 +405,10 @@ private:
     }
 
     void adapt_info_enum(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // dwarfデータのnameが空の場合は無名定義
+        if (dw_info.name.size() == 0) {
+            dw_info.name = "<unnamed>";
+        }
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -369,6 +417,10 @@ private:
     }
 
     void adapt_info_member(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // dwarfデータのnameが空の場合は無名定義
+        if (dw_info.name.size() == 0) {
+            dw_info.name = "<unnamed>";
+        }
         // 対象データが空ならdw_infoを反映する
         adapt_value_force(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -446,12 +498,20 @@ private:
 
     void adapt_info_typedef(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
-        adapt_value_force(dbg_info.name, dw_info.name);
+        if (opt_.is_through_typedef) {
+            adapt_value(dbg_info.name, dw_info.name);
+        } else {
+            adapt_value_force(dbg_info.name, dw_info.name);
+        }
         //
         dbg_info.tag |= dw_info.tag;
     }
 
     void adapt_info_struct_union(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // dwarfデータのnameが空の場合は無名定義
+        if (dw_info.name.size() == 0) {
+            dw_info.name = "<unnamed>";
+        }
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -618,11 +678,7 @@ public:
         };
     };
 
-    bool lookup_ctrl_not_expand_array;
-
     void get_var_info(std::function<bool(var_info_view &)> &&func) {
-        lookup_ctrl_not_expand_array = true;
-
         std::string prefix = "";
 
         // global_varをすべてチェック
@@ -802,7 +858,7 @@ private:
         for (size_t i = 0; i < type.count; i++) {
             // 表示名作成
             var_name.clear();
-            if (lookup_ctrl_not_expand_array) {
+            if (!opt_.is_expand_array) {
                 if (prefix.size() == 0) {
                     std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, type.count);
                 } else {
@@ -833,7 +889,7 @@ private:
             //  member check
             lookup_var_member(type, view.address, var_name, depth + 1, std::forward<Func>(func));
 
-            if (lookup_ctrl_not_expand_array)
+            if (!opt_.is_expand_array)
                 break;
         }
 
