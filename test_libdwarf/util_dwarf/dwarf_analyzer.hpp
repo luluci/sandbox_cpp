@@ -21,47 +21,6 @@ namespace util_dwarf {
 
 class dwarf_analyzer {
 public:
-    struct option
-    {
-        using type = uint32_t;
-
-        enum mode : type
-        {
-            none,
-            func_info_analyze = 1 << 0,
-            no_impl_warning   = 1 << 1,
-        };
-
-        bool is_func_info_analyze;
-        bool is_no_impl_warning;
-
-        option(type flags = none) : is_func_info_analyze(false), is_no_impl_warning(false) {
-            set(flags);
-        }
-
-        void set(type flags) {
-            set_impl(flags, true);
-        }
-        void unset(type flags) {
-            set_impl(flags, false);
-        }
-
-    private:
-        void set_impl(type flags, bool value) {
-            if (check_flag(flags, func_info_analyze)) {
-                is_func_info_analyze = value;
-            }
-            if (check_flag(flags, no_impl_warning)) {
-                is_no_impl_warning = value;
-            }
-        }
-
-        bool check_flag(type flags, mode flag) {
-            return ((flags & flag) == flag);
-        }
-    };
-
-public:
     // DIE情報
     // Debugging Information Entry
     struct die_info_t
@@ -141,7 +100,7 @@ public:
         return true;
     }
 
-    void analyze(dwarf_info &info) {
+    void analyze(dwarf_info &info, dwarf_analyze_option opt) {
         Dwarf_Bool dw_is_info = true;
         Dwarf_Die dw_cu_die;
 
@@ -152,6 +111,7 @@ public:
         analyze_info_          = dwarf_analyze_info();
         analyze_info_.dw_dbg   = dw_dbg;
         analyze_info_.dw_error = dw_error;
+        analyze_info_.option   = opt;
 
         // アーキテクチャ情報取得
         analyze_machine_architecture(info);
@@ -216,7 +176,7 @@ public:
         }
 
         auto result = dwarf_finish(dw_dbg);
-        printf("dwarf_finish : result : %d\n", result);
+        // printf("dwarf_finish : result : %d\n", result);
         dw_dbg = nullptr;
         return (result == DW_DLV_OK);
     }
@@ -530,9 +490,11 @@ private:
                 break;
         }
 
-        const char *name = 0;
-        dwarf_get_TAG_name(die_info.tag, &name);
-        printf("no impl : %s (%u)\n", name, die_info.tag);
+        if (analyze_info_.option.is_no_impl_warning) {
+            const char *name = 0;
+            dwarf_get_TAG_name(die_info.tag, &name);
+            printf("no impl : %s (%u)\n", name, die_info.tag);
+        }
     }
 
     // // DW_TAG_*に0がアサインされていないことを前提として、TAG無指定のみ有効化している

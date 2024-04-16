@@ -197,9 +197,10 @@ int main(int argc, char *argv[]) {
         clock_t s, t;
         s = clock();
         // dwarf解析
-        using analyze_opt = util_dwarf::dwarf_analyzer::option;
-        analyze_opt anlz_opt(analyze_opt::off_func_info_analyze | analyze_opt::on_no_impl_warning);
-        di.analyze(dw_info);
+        using da_opt = util_dwarf::dwarf_analyze_option;
+        da_opt daopt;
+        daopt.unset(da_opt::func_info_analyze | da_opt::no_impl_warning);
+        di.analyze(dw_info, daopt);
         t = clock();
         printf("%f\n", static_cast<double>(t - s) / CLOCKS_PER_SEC);
 
