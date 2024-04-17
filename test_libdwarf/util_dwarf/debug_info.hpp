@@ -352,7 +352,7 @@ private:
 
             default:
                 // 実装忘れ
-                printf("no impl : build_node : 0x%02X\n", dw_info.tag);
+                fprintf(stderr, "no impl : build_node : 0x%02X\n", dw_info.tag);
                 break;
         }
     }

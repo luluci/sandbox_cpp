@@ -19,7 +19,7 @@ namespace utility {
 // 戻り値がOKじゃないけどエラーでもないケースある？
 void error_happen(Dwarf_Error *error) {
     char *errmsg = dwarf_errmsg(*error);
-    printf("%s\n", errmsg);
+    fprintf(stderr, "%s\n", errmsg);
     throw std::runtime_error("libdwarf API error!");
     exit(1);  // 一応書いておく
 }

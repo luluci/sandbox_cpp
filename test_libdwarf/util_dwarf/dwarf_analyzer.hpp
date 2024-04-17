@@ -47,8 +47,8 @@ private:
 
     static void err_handler(Dwarf_Error error, Dwarf_Ptr dw_errarg) {
         char *errmsg = dwarf_errmsg(error);
-        printf("errmsg: %s\n", errmsg);
-        printf("errarg: (0x%p)\n", dw_errarg);
+        fprintf(stderr, "errmsg: %s\n", errmsg);
+        fprintf(stderr, "errarg: (0x%p)\n", dw_errarg);
         throw std::runtime_error("libdwarf API error!");
         exit(1);  // 一応書いておく
     }
@@ -75,7 +75,7 @@ public:
 
     bool open(char const *dwarf_file_path_cstr) {
         if (dw_dbg != nullptr) {
-            printf("dwarf file is already open : %s\n", dwarf_file_path.c_str());
+            fprintf(stderr, "dwarf file is already open : %s\n", dwarf_file_path.c_str());
             return false;
         }
 
@@ -490,11 +490,9 @@ private:
                 break;
         }
 
-        if (analyze_info_.option.is_no_impl_warning) {
-            const char *name = 0;
-            dwarf_get_TAG_name(die_info.tag, &name);
-            printf("no impl : %s (%u)\n", name, die_info.tag);
-        }
+        const char *name = 0;
+        dwarf_get_TAG_name(die_info.tag, &name);
+        fprintf(stderr, "no impl : %s (%u)\n", name, die_info.tag);
     }
 
     // // DW_TAG_*に0がアサインされていないことを前提として、TAG無指定のみ有効化している
@@ -583,7 +581,7 @@ private:
 
         const char *name = 0;
         dwarf_get_TAG_name(die_info.tag, &name);
-        printf("no impl : DW_TAG_enumeration_type child : %s (%u)\n", name, die_info.tag);
+        fprintf(stderr, "no impl : DW_TAG_enumeration_type child : %s (%u)\n", name, die_info.tag);
     }
     // DW_TAG_enumerator
     type_child analyze_DW_TAG_enumerator(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
@@ -690,7 +688,7 @@ private:
 
         const char *name = 0;
         dwarf_get_TAG_name(die_info.tag, &name);
-        printf("no impl : DW_TAG_struct/union child : %s (%u)\n", name, die_info.tag);
+        fprintf(stderr, "no impl : DW_TAG_struct/union child : %s (%u)\n", name, die_info.tag);
     }
 
     type_child analyze_DW_TAG_member(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
@@ -756,7 +754,7 @@ private:
 
         const char *name = 0;
         dwarf_get_TAG_name(die_info.tag, &name);
-        printf("no impl : DW_TAG_array_type child : %s (%u)\n", name, die_info.tag);
+        fprintf(stderr, "no impl : DW_TAG_array_type child : %s (%u)\n", name, die_info.tag);
     }
 
     type_child analyze_DW_TAG_subrange_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
@@ -814,7 +812,7 @@ private:
 
         const char *name = 0;
         dwarf_get_TAG_name(die_info.tag, &name);
-        printf("no impl : DW_TAG_subroutine_type child : %s (%u)\n", name, die_info.tag);
+        fprintf(stderr, "no impl : DW_TAG_subroutine_type child : %s (%u)\n", name, die_info.tag);
     }
     // DW_TAG_formal_parameter
     type_child analyze_DW_TAG_formal_parameter(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
@@ -901,7 +899,7 @@ private:
 
             const char *name = 0;
             dwarf_get_TAG_name(tag, &name);
-            printf("no impl : %s child : %s (%u)\n", parent_tag, name, tag);
+            fprintf(stderr, "no impl : %s child : %s (%u)\n", parent_tag, name, tag);
             return true;
         });
         // 異常が発生していたらfalseが返される

@@ -37,7 +37,7 @@ ReturnT get_DW_FORM_block1(dwarf_analyze_info &info) {
         auto eval = info.dw_expr.pop();
         if (!eval) {
             // ありえない
-            printf("error: get_DW_FORM_block1 : DWARF expr logic error.");
+            fprintf(stderr, "error: get_DW_FORM_block1 : DWARF expr logic error.");
         }
         value = *eval;
     }
@@ -73,7 +73,7 @@ ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
         auto eval = info.dw_expr.pop();
         if (!eval) {
             // ありえない
-            printf("error: get_DW_FORM_block_N : DWARF expr logic error.");
+            fprintf(stderr, "error: get_DW_FORM_block_N : DWARF expr logic error.");
         }
         value = *eval;
     }
@@ -215,7 +215,7 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
         case DW_FORM_block4:
             return get_DW_FORM_block_N<4, T>(info);
         case DW_FORM_block:
-            printf("no implemented! : DW_FORM_block\n");
+            fprintf(stderr, "no implemented! : DW_FORM_block\n");
             break;
         case DW_FORM_block1:
             return get_DW_FORM_block_N<1, T>(info);

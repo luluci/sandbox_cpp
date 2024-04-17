@@ -550,7 +550,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
     // no impl
     const char *attrname = nullptr;
     dwarf_get_AT_name(attrnum, &attrname);
-    printf("no impl : %s (%u)\n", attrname, attrnum);
+    fprintf(stderr, "no impl : %s (%u)\n", attrname, attrnum);
 }
 
 /// @brief 対象DIEに紐づくattributeを解析して情報を取得する
