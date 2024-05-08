@@ -638,6 +638,10 @@ private:
             case DW_TAG_member: {
                 // member情報を作成
                 auto mem_info = analyze_DW_TAG_member(die, dw_info, die_info);
+                // member情報チェック
+                if (mem_info->bit_size > 0) {
+                    parent_type.has_bitfield = true;
+                }
                 // parentのmemberに登録
                 parent_type.child_list.push_back(std::move(mem_info));
                 return;

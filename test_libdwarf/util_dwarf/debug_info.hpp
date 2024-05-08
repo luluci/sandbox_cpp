@@ -137,6 +137,9 @@ public:
         // array/member用
         type_info *sub_info;
 
+        // 付加情報
+        bool has_bitfield;
+
         type_info()
             : tag(0),
               name(nullptr),
@@ -154,7 +157,8 @@ public:
               is_restrict(false),
               is_volatile(false),
               child_list(nullptr),
-              sub_info(nullptr) {
+              sub_info(nullptr),
+              has_bitfield(false) {
         }
     };
 
@@ -516,6 +520,7 @@ private:
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
         adapt_value(dbg_info.child_list, dw_info.child_list);
+        adapt_value(dbg_info.has_bitfield, dw_info.has_bitfield);
         //
         dbg_info.tag |= dw_info.tag;
     }
@@ -627,6 +632,11 @@ private:
     void adapt_value(Dwarf_Unsigned &dst, std::optional<Dwarf_Unsigned> &src) {
         if (dst == 0 && src) {
             dst = *src;
+        }
+    }
+    void adapt_value(bool &dst, bool &src) {
+        if (src) {
+            dst = src;
         }
     }
 

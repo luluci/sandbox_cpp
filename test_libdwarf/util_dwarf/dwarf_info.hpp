@@ -135,6 +135,9 @@ struct dwarf_info
         using child_list_t = std::list<child_node_t>;
         child_list_t child_list;
 
+        // 付加情報
+        bool has_bitfield;
+
         type_info()
             : tag(0),
               name(),
@@ -154,7 +157,8 @@ struct dwarf_info
               signature(0),
               accessibility(0),
               encoding(0),
-              endianity(0) {
+              endianity(0),
+              has_bitfield(false) {
         }
     };
 
