@@ -9,6 +9,8 @@
 #include <optional>
 #include <vector>
 
+#include "LEB128.hpp"
+
 namespace util_dwarf {
 
 // Dwarf expression 計算機
@@ -50,13 +52,10 @@ public:
             value = *pop_value;
         }
 
-        // little endianで結合
-        // [buff_size]~[1]
+        // LEB128形式でデコードする
         // [0]はopeコードなので除外
-        for (size_t i = buff_size - 1; i > 0; i--) {
-            value <<= 8;
-            value |= buff[i];
-        }
+        ULEB128 leb(&buff[1], buff_size - 1);
+        value += leb.value;
         //
         stack_.push_back(value);
         //

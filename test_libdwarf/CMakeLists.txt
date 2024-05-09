@@ -8,7 +8,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0 -pg")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g3 -Og -pg")
 set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os -s -DNDEBUG -march=native")
-set(CMAKE_BUILD_TYPE Debug)
+# set(CMAKE_BUILD_TYPE Debug)
 
 # 変数
 #set(LIBDWARF_DIR D:/msys64/usr/local/libdwarf_092)

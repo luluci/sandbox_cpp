@@ -207,8 +207,9 @@ int main(int argc, char *argv[]) {
         //
         using diopt = util_dwarf::debug_info::option;
         diopt opt;
+        // opt.set(diopt::expand_array);
         // opt.set(diopt::through_typedef | diopt::expand_array);
-        opt.unset(diopt::through_typedef);
+        // opt.unset(diopt::through_typedef);
         // opt.unset(diopt::expand_array);
         auto debug_info = util_dwarf::debug_info(dw_info, opt);
         debug_info.build();
