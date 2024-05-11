@@ -20,6 +20,13 @@
 
 namespace util_dwarf {
 
+namespace attr_class {
+// attribute_class
+
+using block = std::vector<uint8_t>;
+
+}  // namespace attr_class
+
 struct dwarf_info
 {
     // 変数情報

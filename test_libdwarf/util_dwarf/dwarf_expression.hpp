@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "LEB128.hpp"
+#include "utility.hpp"
 
 namespace util_dwarf {
 
@@ -72,12 +73,95 @@ public:
         return true;
     }
     //
+    template <size_t N>
+    bool eval_DW_OP_breg_N(uint8_t *buff, size_t buff_size) {
+        Dwarf_Signed value = 0;
+
+        // no impl!
+
+        // register_N から値を取り出す
+        // レジスタが64bit以上の場合はオーバーフロー注意
+        // value = register;
+        // SLEB128のoffsetを適用する
+        SLEB128 leb(&buff[1], buff_size - 1);
+        value += leb.value;
+
+        stack_.push_back(static_cast<Dwarf_Unsigned>(value));
+        return true;
+    }
+    //
+    template <size_t N>
+    bool eval_DW_OP_bregx(uint8_t *buff, size_t buff_size) {
+        Dwarf_Signed value = 0;
+        size_t index       = 1;
+        size_t reg_no;
+
+        // no impl!
+
+        // registerを指定するULEB128を取得
+        ULEB128 uleb(&buff[index], buff_size - 1);
+        reg_no = uleb.value;
+        // ULEB128の後ろにSLEB128
+        index += uleb.used_bytes;
+
+        // register_N から値を取り出す
+        // レジスタが64bit以上の場合はオーバーフロー注意
+        // value = register;
+        // SLEB128のoffsetを適用する
+        SLEB128 leb(&buff[index], buff_size - 1);
+        value += leb.value;
+
+        stack_.push_back(static_cast<Dwarf_Unsigned>(value));
+        return true;
+    }
+    //
+    template <size_t N>
+    bool eval_DW_OP_reg_N(uint8_t *buff, size_t buff_size) {
+        Dwarf_Unsigned value = 0;
+
+        // no impl!
+
+        // register_N から値を取り出す
+        // value = register;
+
+        stack_.push_back(value);
+        return true;
+    }
+    //
+    template <typename T, size_t N>
+    bool eval_DW_OP_const_N(uint8_t *buff, size_t buff_size) {
+        T value = 0;
+
+        if (1 + N >= buff_size) {
+            fprintf(stderr, "error: DW_OP_const_N : invalid buff_size(%lld) require %lld bytes\n", buff_size, 1 + N);
+            return false;
+        }
+        // N byteのデータを取得する
+        value = utility::concat_le<T>(buff, 1, 1 + N);
+        stack_.push_back(value);
+        //
+        return true;
+    }
+    //
     bool eval_DW_OP_constu(uint8_t *buff, size_t buff_size) {
         Dwarf_Unsigned value = 0;
 
         // LEB128形式でデコードする
         // [0]はopeコードなので除外
         ULEB128 leb(&buff[1], buff_size - 1);
+        value += leb.value;
+        //
+        stack_.push_back(value);
+        //
+        return true;
+    }
+    //
+    bool eval_DW_OP_consts(uint8_t *buff, size_t buff_size) {
+        Dwarf_Signed value = 0;
+
+        // LEB128形式でデコードする
+        // [0]はopeコードなので除外
+        SLEB128 leb(&buff[1], buff_size - 1);
         value += leb.value;
         //
         stack_.push_back(value);
@@ -181,25 +265,25 @@ public:
             case DW_OP_lit31:
                 return eval_DW_OP_lit_N<31>();
             case DW_OP_const1u:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Unsigned, 1>(buff, buff_size);
             case DW_OP_const1s:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Signed, 1>(buff, buff_size);
             case DW_OP_const2u:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Unsigned, 2>(buff, buff_size);
             case DW_OP_const2s:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Signed, 2>(buff, buff_size);
             case DW_OP_const4u:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Unsigned, 4>(buff, buff_size);
             case DW_OP_const4s:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Signed, 4>(buff, buff_size);
             case DW_OP_const8u:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Unsigned, 8>(buff, buff_size);
             case DW_OP_const8s:
-                break;
+                return eval_DW_OP_const_N<Dwarf_Signed, 8>(buff, buff_size);
             case DW_OP_constu:
                 return eval_DW_OP_constu(buff, buff_size);
             case DW_OP_consts:
-                break;
+                return eval_DW_OP_consts(buff, buff_size);
             case DW_OP_fbreg:
                 break;
             case DW_OP_breg0:

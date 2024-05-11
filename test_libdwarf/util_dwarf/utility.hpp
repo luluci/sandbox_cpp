@@ -24,14 +24,14 @@ void error_happen(Dwarf_Error *error) {
     exit(1);  // 一応書いておく
 }
 
-Dwarf_Unsigned concat_le(uint8_t const *buff, size_t begin, size_t end) {
+template <typename T>
+T concat_le(uint8_t const *buff, size_t begin, size_t end) {
     Dwarf_Unsigned result = 0;
-    size_t shift          = 0;
-    for (size_t i = begin; i < end; i++) {
-        result |= (buff[i] << shift);
-        shift += 8;
+    size_t index          = end - 1;
+    for (size_t i = begin; i < end; i++, index--) {
+        result = buff[index] | (result << 8);
     }
-    return result;
+    return static_cast<T>(result);
 }
 }  // namespace utility
 

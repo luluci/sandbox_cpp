@@ -10,20 +10,23 @@ template <typename T>
 struct LEB128
 {
     T value;
+    size_t used_bytes;
 
-    LEB128(uint8_t *buff, size_t len) : value(0) {
+    LEB128(uint8_t *buff, size_t len) : value(0), used_bytes(0) {
         decode(buff, len);
     }
 
     void decode(uint8_t *buff, size_t len) {
         size_t shift = 0;
         value        = 0;
+        used_bytes   = 0;
 
         for (size_t i = 0; i < len; i++) {
             auto &data = buff[i];
 
             // 下位7bitを連結してデータを構築する
             value |= (data & 0x7F) << shift;
+            used_bytes++;
 
             // 最上位bitが0なら終了
             if ((data & 0x80) == 0) {

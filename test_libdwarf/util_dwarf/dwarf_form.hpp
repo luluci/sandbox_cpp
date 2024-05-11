@@ -29,12 +29,12 @@ ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
     // N = 4: [ length1 length2 length3 length4 data1 data2 ... ] or [ DWARF expr ]
     auto buff_ptr        = static_cast<uint8_t *>(tempb->bl_data);
     auto buff_len        = tempb->bl_len;
-    Dwarf_Unsigned len   = N + utility::concat_le(buff_ptr, 0, N);
+    Dwarf_Unsigned len   = N + utility::concat_le<Dwarf_Unsigned>(buff_ptr, 0, N);
     Dwarf_Unsigned value = 0;
     if (buff_len == len) {
         // length byte と valueの要素数が一致するとき、block<N>として解釈
         // dataをlittle endianで結合
-        value = utility::concat_le(buff_ptr, N, buff_len);
+        value = utility::concat_le<Dwarf_Unsigned>(buff_ptr, N, buff_len);
     } else {
         // 一致しないとき、DWARF expression として解釈
         info.dw_expr.eval(buff_ptr, buff_len);
