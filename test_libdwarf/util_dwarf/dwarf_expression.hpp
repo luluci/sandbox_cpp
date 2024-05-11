@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <variant>
 #include <vector>
 
 #include "LEB128.hpp"
@@ -15,7 +16,8 @@ namespace util_dwarf {
 
 // Dwarf expression 計算機
 class dwarf_expression {
-    using stack_t = std::vector<Dwarf_Unsigned>;
+    using value_t = std::variant<Dwarf_Unsigned, Dwarf_Signed>;
+    using stack_t = std::vector<value_t>;
     stack_t stack_;
     static constexpr size_t default_stack_size = 10;
 
@@ -47,7 +49,9 @@ public:
     //
     bool eval_DW_OP_plus_uconst(uint8_t *buff, size_t buff_size) {
         Dwarf_Unsigned value = 0;
-        auto pop_value       = pop();
+
+        // stackに値が積まれていたら取得して加算する
+        auto pop_value = pop<Dwarf_Unsigned>();
         if (pop_value) {
             value = *pop_value;
         }
@@ -67,13 +71,34 @@ public:
         stack_.push_back(N);
         return true;
     }
+    //
+    bool eval_DW_OP_constu(uint8_t *buff, size_t buff_size) {
+        Dwarf_Unsigned value = 0;
 
-    std::optional<Dwarf_Unsigned> pop() {
+        // LEB128形式でデコードする
+        // [0]はopeコードなので除外
+        ULEB128 leb(&buff[1], buff_size - 1);
+        value += leb.value;
+        //
+        stack_.push_back(value);
+        //
+        return true;
+    }
+
+    template <typename T, typename Result = std::optional<T>>
+    Result pop() {
         if (stack_.size() > 0) {
             // スタックから値をpop
-            Dwarf_Unsigned result = stack_.back();
+            Result result;
+            value_t &value = stack_.back();
+            // if (std::holds_alternative<T>(value)) {
+            //     result = std::get<T>(value);
+            // }
+            // variantから値を取り出す
+            // signedからunsignedのどちらかになるが、暫定でTにキャストしてしまう
+            result = std::visit([](const auto &x) -> T { return static_cast<T>(x); }, value);
             stack_.pop_back();
-            return std::optional<Dwarf_Unsigned>(result);
+            return result;
         }
         return std::nullopt;
     }
@@ -172,7 +197,7 @@ public:
             case DW_OP_const8s:
                 break;
             case DW_OP_constu:
-                break;
+                return eval_DW_OP_constu(buff, buff_size);
             case DW_OP_consts:
                 break;
             case DW_OP_fbreg:

@@ -15,38 +15,6 @@
 namespace util_dwarf {
 
 //
-template <typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM_block1(dwarf_analyze_info &info) {
-    Dwarf_Block *tempb = 0;
-    int result;
-    result = dwarf_formblock(info.dw_attr, &tempb, &(info.dw_error));
-    if (result != DW_DLV_OK) {
-        utility::error_happen(&(info.dw_error));
-        return std::nullopt;
-    }
-    // [ length data1 data2 ... ] or [ DWARF expr ]
-    Dwarf_Unsigned len   = 1 + (static_cast<uint8_t *>(tempb->bl_data))[0];
-    Dwarf_Unsigned value = 0;
-    if (tempb->bl_len == len) {
-        // length byte と valueの要素数が一致するとき、block1として解釈
-        // dataをlittle endianで結合
-        value = utility::concat_le(static_cast<uint8_t *>(tempb->bl_data), 1, tempb->bl_len);
-    } else {
-        // 一致しないとき、DWARF expression として解釈
-        info.dw_expr.eval(static_cast<uint8_t *>(tempb->bl_data), tempb->bl_len);
-        auto eval = info.dw_expr.pop();
-        if (!eval) {
-            // ありえない
-            fprintf(stderr, "error: get_DW_FORM_block1 : DWARF expr logic error.");
-        }
-        value = *eval;
-    }
-
-    // https://www.prevanders.net/libdwarfdoc/group__examplediscrlist.html
-    dwarf_dealloc(info.dw_dbg, tempb, DW_DLA_BLOCK);
-    return ReturnT(value);
-}
-//
 template <size_t N, typename T, typename ReturnT = std::optional<T>>
 ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
     Dwarf_Block *tempb = 0;
@@ -70,7 +38,7 @@ ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
     } else {
         // 一致しないとき、DWARF expression として解釈
         info.dw_expr.eval(buff_ptr, buff_len);
-        auto eval = info.dw_expr.pop();
+        auto eval = info.dw_expr.pop<T>();
         if (!eval) {
             // ありえない
             fprintf(stderr, "error: get_DW_FORM_block_N : DWARF expr logic error.");
@@ -145,7 +113,7 @@ ReturnT get_DW_FORM_exprloc(dwarf_analyze_info &info) {
         return std::nullopt;
     }
     info.dw_expr.eval(static_cast<uint8_t *>(block_ptr), return_exprlen);
-    auto eval = info.dw_expr.pop();
+    auto eval = info.dw_expr.pop<T>();
     if (eval) {
         return ReturnT(*eval);
     }
