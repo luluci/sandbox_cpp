@@ -731,6 +731,7 @@ public:
 
     void get_var_info(std::function<bool(var_info_view &)> &&func) {
         std::string prefix = "";
+        bool result;
 
         // global_varをすべてチェック
         for (auto &var : global_var_tbl) {
@@ -738,7 +739,10 @@ public:
             if (var->type) {
                 auto it = type_map.find(*(var->type));
                 if (it != type_map.end()) {
-                    lookup_var(*var, it->second, prefix, 0, func);
+                    result = lookup_var(*var, it->second, prefix, 0, func);
+                    if (!result) {
+                        break;
+                    }
                 }
             }
         }
@@ -767,7 +771,8 @@ private:
     }
 
     template <typename Func>
-    void lookup_var(var_info &var, type_info &type, std::string &prefix, size_t depth, Func &&func) {
+    bool lookup_var(var_info &var, type_info &type, std::string &prefix, size_t depth, Func &&func) {
+        bool result;
         var_info_view view;
         Dwarf_Off address;
         // 型タグ作成
@@ -782,22 +787,26 @@ private:
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
-            lookup_var_impl_array(view, type, address, prefix, depth, func);
+            result = lookup_var_impl_array(view, type, address, prefix, depth, func);
         } else {
             // 配列以外のとき
-            lookup_var_impl_default(view, type, address, prefix, depth, func);
+            result = lookup_var_impl_default(view, type, address, prefix, depth, func);
         }
+
+        return result;
     }
 
     template <typename Func>
-    void lookup_var_member(type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+    bool lookup_var_member(type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+        bool result;
+
         //  pointerは展開しない
         //  function: 引数としてchildを持つ -> 展開しない
         if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) != 0) {
-            return;
+            return true;
         }
         if (type.member_list == nullptr) {
-            return;
+            return true;
         }
 
         for (auto &mem : *type.member_list) {
@@ -809,11 +818,17 @@ private:
                 member_type = member.sub_info;
             }
             // member毎処理
-            lookup_var_member_each(member, *member_type, base_address, prefix, depth, func);
+            result = lookup_var_member_each(member, *member_type, base_address, prefix, depth, func);
+            if (!result) {
+                break;
+            }
         }
+
+        return result;
     }
     template <typename Func>
-    void lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+    bool lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+        bool result;
         Dwarf_Off address;
         var_info_view view;
         // 型タグ作成
@@ -825,22 +840,24 @@ private:
         if (member.bit_size == 0) {
             // bit_sizeがゼロならビットフィールドでない
             if ((member.tag & util_dwarf::debug_info::type_tag::array) != 0) {
-                lookup_var_impl_array(view, member, address, prefix, depth, func);
+                result = lookup_var_impl_array(view, member, address, prefix, depth, func);
             } else {
-                lookup_var_impl_default(view, member, address, prefix, depth, func);
+                result = lookup_var_impl_default(view, member, address, prefix, depth, func);
             }
 
         } else {
             // bit_sizeがゼロ以外ならビットフィールド
-            lookup_var_impl_bitfield(view, member, address, prefix, depth, func);
+            result = lookup_var_impl_bitfield(view, member, address, prefix, depth, func);
         }
+
+        return result;
     }
 
     template <typename Func>
-    void lookup_var_impl_default(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+    bool lookup_var_impl_default(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
         auto tag_name_org = view.tag_name;
         std::string var_name;
-        bool cb_result;
+        bool result;
 
         // 表示名作成
         if (prefix.size() == 0) {
@@ -858,20 +875,21 @@ private:
         view.bit_size   = 0;
 
         // コールバック
-        cb_result = func(view);
-        if (!cb_result) {
-            return;
+        result = func(view);
+        if (!result) {
+            return result;
         }
 
         //  member check
-        lookup_var_member(type, view.address, var_name, depth + 1, func);
+        result = lookup_var_member(type, view.address, var_name, depth + 1, func);
+        return result;
     }
 
     template <typename Func>
-    void lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t /*depth*/, Func &func) {
+    bool lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t /*depth*/, Func &func) {
         auto tag_name_org = view.tag_name;
         std::string var_name;
-        bool cb_result;
+        bool result;
         Dwarf_Off address;
         Dwarf_Unsigned bit_offset;
 
@@ -894,14 +912,13 @@ private:
         view.bit_size    = type.bit_size;
 
         // コールバック
-        cb_result = func(view);
-        if (!cb_result) {
-            return;
-        }
+        result = func(view);
+        return result;
     }
 
     template <typename Func>
-    void lookup_var_impl_array(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+    bool lookup_var_impl_array(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+        bool result = true;
         // 多次元配列ケアのために再帰的コールして変数名を作成する
         // 末尾まで到達したら変数の内容をコールバックする
         // arrayなら必ずsubrangeを持つはずだが一応チェック
@@ -916,19 +933,21 @@ private:
             }
             // インデックス作成
             auto it = type.array_range_list->begin();
-            lookup_var_impl_array_idx(view, type, base_address, var_name, depth, it, func);
+            result  = lookup_var_impl_array_idx(view, type, base_address, var_name, depth, it, func);
 
             // 念のため
             view.tag_name = tag_name_org;
         }
+
+        return result;
     }
 
     template <typename Func>
-    void lookup_var_impl_array_idx(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth,
+    bool lookup_var_impl_array_idx(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth,
                                    type_info::child_list_t::iterator &array_d_it, Func &func) {
         std::string var_name;
         Dwarf_Off address;
-        bool cb_result;
+        bool result = true;
 
         // array_d次の要素数から名称作成
         for (size_t i = 0; i < (*array_d_it)->count; i++) {
@@ -946,21 +965,25 @@ private:
             array_d_it++;
             if (array_d_it == type.array_range_list->end()) {
                 // 最終次なら変数内容を表示
-                lookup_var_impl_array_data(view, type, address, var_name, depth, func);
+                result = lookup_var_impl_array_data(view, type, address, var_name, depth, func);
             } else {
                 // 最終次でないなら名称作成を継続
-                lookup_var_impl_array_idx(view, type, address, var_name, depth, array_d_it, func);
+                result = lookup_var_impl_array_idx(view, type, address, var_name, depth, array_d_it, func);
             }
+            if (!result)
+                break;
 
             // array展開無しなら終了
             if (!opt_.is_expand_array)
                 break;
         }
+
+        return result;
     }
 
     template <typename Func>
-    void lookup_var_impl_array_data(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
-        bool cb_result;
+    bool lookup_var_impl_array_data(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+        bool result;
 
         view.tag_name = &prefix;
         // アドレス計算
@@ -972,13 +995,14 @@ private:
         view.bit_size   = 0;
 
         // コールバック
-        cb_result = func(view);
-        if (!cb_result) {
-            return;
+        result = func(view);
+        if (!result) {
+            return result;
         }
 
         //  member check
-        lookup_var_member(type, base_address, prefix, depth + 1, func);
+        result = lookup_var_member(type, base_address, prefix, depth + 1, func);
+        return result;
     }
 };
 
