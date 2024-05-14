@@ -130,10 +130,14 @@ public:
         bool is_restrict;
         bool is_volatile;
 
-        // member or parameter
         using child_node_t = type_info *;
         using child_list_t = std::list<child_node_t>;
-        child_list_t *child_list;
+        // member
+        child_list_t *member_list;
+        // parameter
+        child_list_t *param_list;
+        // subrange[]
+        child_list_t *array_range_list;
         // array/member用
         type_info *sub_info;
 
@@ -156,7 +160,9 @@ public:
               is_const(false),
               is_restrict(false),
               is_volatile(false),
-              child_list(nullptr),
+              member_list(nullptr),
+              param_list(nullptr),
+              array_range_list(nullptr),
               sub_info(nullptr),
               has_bitfield(false) {
         }
@@ -354,6 +360,10 @@ private:
                 adapt_info_parameter(dbg_info, dw_info);
                 break;
 
+            case type_tag::subrange:
+                adapt_info_subrange(dbg_info, dw_info);
+                break;
+
             default:
                 // 実装忘れ
                 fprintf(stderr, "no impl : build_node : 0x%02X\n", dw_info.tag);
@@ -484,7 +494,7 @@ private:
         dbg_info.name = &dw_info.name;
         //
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
-        adapt_value(dbg_info.child_list, dw_info.child_list);
+        adapt_value(dbg_info.param_list, dw_info.child_list);
         //
         dbg_info.tag |= dw_info.tag;
     }
@@ -519,7 +529,7 @@ private:
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
-        adapt_value(dbg_info.child_list, dw_info.child_list);
+        adapt_value(dbg_info.member_list, dw_info.child_list);
         adapt_value(dbg_info.has_bitfield, dw_info.has_bitfield);
         //
         dbg_info.tag |= dw_info.tag;
@@ -528,7 +538,34 @@ private:
     void adapt_info_array(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
+        // arrayはsub_infoに型情報を保持している
+        // dwarf_infoではchild_listにsubrangeを保持している
+        // debug_infoではarray_range_listに参照を持たせる
+        adapt_value_force(dbg_info.array_range_list, dw_info.child_list);
+        // array_range_list から配列の各次元のサイズ数を計算する
+        // 最終次からループして、各次元の要素1つあたりのサイズを計算する
+        Dwarf_Unsigned child_size;
+        auto it = dbg_info.array_range_list->rbegin();
+        // 最終次はarrayの型サイズになる
+        child_size = dbg_info.byte_size;
+        for (; it != dbg_info.array_range_list->rend(); it++) {
+            (*it)->byte_size = child_size;
+            // 上位次のサイズを計算
+            // 現在次の型サイズ * 要素数 になる
+            child_size = child_size * (*it)->count;
+        }
+        //
+        dbg_info.tag |= dw_info.tag;
+    }
+
+    void adapt_info_subrange(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        //
+        adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.count, dw_info.count);
+        //
+        if (dw_info.type) {
+            dbg_info.sub_info = get_type_info(*dw_info.type);
+        }
         //
         dbg_info.tag |= dw_info.tag;
     }
@@ -628,6 +665,10 @@ private:
             auto &new_list = child_list_list.back();
             dst            = &new_list;
         }
+    }
+    void adapt_value_force(debug_info::type_info::child_list_t *&dst, dwarf_info::type_info::child_list_t &src) {
+        dst = nullptr;
+        adapt_value(dst, src);
     }
     void adapt_value(Dwarf_Unsigned &dst, std::optional<Dwarf_Unsigned> &src) {
         if (dst == 0 && src) {
@@ -741,25 +782,25 @@ private:
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
-            lookup_var_impl_array(view, type, address, prefix, depth, std::forward<Func>(func));
+            lookup_var_impl_array(view, type, address, prefix, depth, func);
         } else {
             // 配列以外のとき
-            lookup_var_impl_default(view, type, address, prefix, depth, std::forward<Func>(func));
+            lookup_var_impl_default(view, type, address, prefix, depth, func);
         }
     }
 
     template <typename Func>
-    void lookup_var_member(type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+    void lookup_var_member(type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
         //  pointerは展開しない
         //  function: 引数としてchildを持つ -> 展開しない
         if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) != 0) {
             return;
         }
-        if (type.child_list == nullptr) {
+        if (type.member_list == nullptr) {
             return;
         }
 
-        for (auto &mem : *type.child_list) {
+        for (auto &mem : *type.member_list) {
             // memberが変数名になる
             auto &member = *mem;
             // memberのchild要素がmemberの型情報を示しているはず
@@ -768,11 +809,11 @@ private:
                 member_type = member.sub_info;
             }
             // member毎処理
-            lookup_var_member_each(member, *member_type, base_address, prefix, depth, std::forward<Func>(func));
+            lookup_var_member_each(member, *member_type, base_address, prefix, depth, func);
         }
     }
     template <typename Func>
-    void lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+    void lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
         Dwarf_Off address;
         var_info_view view;
         // 型タグ作成
@@ -784,19 +825,19 @@ private:
         if (member.bit_size == 0) {
             // bit_sizeがゼロならビットフィールドでない
             if ((member.tag & util_dwarf::debug_info::type_tag::array) != 0) {
-                lookup_var_impl_array(view, member, address, prefix, depth, std::forward<Func>(func));
+                lookup_var_impl_array(view, member, address, prefix, depth, func);
             } else {
-                lookup_var_impl_default(view, member, address, prefix, depth, std::forward<Func>(func));
+                lookup_var_impl_default(view, member, address, prefix, depth, func);
             }
 
         } else {
             // bit_sizeがゼロ以外ならビットフィールド
-            lookup_var_impl_bitfield(view, member, address, prefix, depth, std::forward<Func>(func));
+            lookup_var_impl_bitfield(view, member, address, prefix, depth, func);
         }
     }
 
     template <typename Func>
-    void lookup_var_impl_default(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
+    void lookup_var_impl_default(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
         auto tag_name_org = view.tag_name;
         std::string var_name;
         bool cb_result;
@@ -823,11 +864,11 @@ private:
         }
 
         //  member check
-        lookup_var_member(type, view.address, var_name, depth + 1, std::forward<Func>(func));
+        lookup_var_member(type, view.address, var_name, depth + 1, func);
     }
 
     template <typename Func>
-    void lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t /*depth*/, Func &&func) {
+    void lookup_var_impl_bitfield(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t /*depth*/, Func &func) {
         auto tag_name_org = view.tag_name;
         std::string var_name;
         bool cb_result;
@@ -860,51 +901,84 @@ private:
     }
 
     template <typename Func>
-    void lookup_var_impl_array(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &&func) {
-        auto tag_name_org = view.tag_name;
+    void lookup_var_impl_array(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+        // 多次元配列ケアのために再帰的コールして変数名を作成する
+        // 末尾まで到達したら変数の内容をコールバックする
+        // arrayなら必ずsubrangeを持つはずだが一応チェック
+        if (type.array_range_list != nullptr && type.array_range_list->size() > 0) {
+            // インデックス手前までのprefixを作成
+            auto tag_name_org = view.tag_name;
+            std::string var_name;
+            if (prefix.size() == 0) {
+                std::format_to(std::back_inserter(var_name), "{}", *tag_name_org);
+            } else {
+                std::format_to(std::back_inserter(var_name), "{}.{}", prefix, *tag_name_org);
+            }
+            // インデックス作成
+            auto it = type.array_range_list->begin();
+            lookup_var_impl_array_idx(view, type, base_address, var_name, depth, it, func);
+
+            // 念のため
+            view.tag_name = tag_name_org;
+        }
+    }
+
+    template <typename Func>
+    void lookup_var_impl_array_idx(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth,
+                                   type_info::child_list_t::iterator &array_d_it, Func &func) {
         std::string var_name;
+        Dwarf_Off address;
         bool cb_result;
 
-        for (size_t i = 0; i < type.count; i++) {
+        // array_d次の要素数から名称作成
+        for (size_t i = 0; i < (*array_d_it)->count; i++) {
+            address = base_address + (i * (*array_d_it)->byte_size);
             // 表示名作成
             var_name.clear();
-            if (!opt_.is_expand_array) {
-                if (prefix.size() == 0) {
-                    std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, type.count);
-                } else {
-                    std::format_to(std::back_inserter(var_name), "{}.{}[{}]", prefix, *tag_name_org, type.count);
-                }
+            if (opt_.is_expand_array) {
+                // array展開あり
+                std::format_to(std::back_inserter(var_name), "{}[{}]", prefix, i);
             } else {
-                if (prefix.size() == 0) {
-                    std::format_to(std::back_inserter(var_name), "{}[{}]", *tag_name_org, i);
-                } else {
-                    std::format_to(std::back_inserter(var_name), "{}.{}[{}]", prefix, *tag_name_org, i);
-                }
-            }
-            view.tag_name = &var_name;
-            // アドレス計算
-            view.address = base_address + (i * type.byte_size);
-            //
-            view.is_array   = true;
-            view.byte_size  = type.byte_size;
-            view.bit_offset = 0;
-            view.bit_size   = 0;
-
-            // コールバック
-            cb_result = func(view);
-            if (!cb_result) {
-                break;
+                // array展開なし
+                std::format_to(std::back_inserter(var_name), "{}[{}]", prefix, (*array_d_it)->count);
             }
 
-            //  member check
-            lookup_var_member(type, view.address, var_name, depth + 1, std::forward<Func>(func));
+            array_d_it++;
+            if (array_d_it == type.array_range_list->end()) {
+                // 最終次なら変数内容を表示
+                lookup_var_impl_array_data(view, type, address, var_name, depth, func);
+            } else {
+                // 最終次でないなら名称作成を継続
+                lookup_var_impl_array_idx(view, type, address, var_name, depth, array_d_it, func);
+            }
 
+            // array展開無しなら終了
             if (!opt_.is_expand_array)
                 break;
         }
+    }
 
-        // 念のため
-        view.tag_name = tag_name_org;
+    template <typename Func>
+    void lookup_var_impl_array_data(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &prefix, size_t depth, Func &func) {
+        bool cb_result;
+
+        view.tag_name = &prefix;
+        // アドレス計算
+        view.address = base_address;
+        //
+        view.is_array   = true;
+        view.byte_size  = type.byte_size;
+        view.bit_offset = 0;
+        view.bit_size   = 0;
+
+        // コールバック
+        cb_result = func(view);
+        if (!cb_result) {
+            return;
+        }
+
+        //  member check
+        lookup_var_member(type, base_address, prefix, depth + 1, func);
     }
 };
 

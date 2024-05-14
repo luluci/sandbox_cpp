@@ -329,7 +329,7 @@ private:
             } else {
                 propernumber = i + 1;
             }
-            printf("File %4ld %s\n", static_cast<unsigned long>(propernumber), srcfiles[i]);
+            fprintf(stderr, "File %4ld %s\n", static_cast<unsigned long>(propernumber), srcfiles[i]);
             dwarf_dealloc(dw_dbg, srcfiles[i], DW_DLA_STRING);
             srcfiles[i] = 0;
         }
@@ -741,13 +741,14 @@ private:
             case DW_TAG_subrange_type: {
                 // subrange情報を作成
                 auto child_info = analyze_DW_TAG_subrange_type(die, dw_info, die_info);
-                // array要素数を示す
+
+                // 多次元配列があるのでarray要素数をchildとして登録
                 if (child_info->count) {
-                    parent_type.count = *child_info->count;
-                } else if (child_info->upper_bound && child_info->lower_bound) {
-                    parent_type.count = *child_info->upper_bound - *child_info->lower_bound + 1;
+                    // 正常であればcountが作成されている
+                    parent_type.child_list.push_back(child_info);
                 } else {
                     // nullopt
+                    fprintf(stderr, "unexpected DW_TAG_subrange_type : not found count info\n");
                 }
                 return;
             }
@@ -762,11 +763,16 @@ private:
     }
 
     type_child analyze_DW_TAG_subrange_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
+        // array要素数として出現する
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::member);
+        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::subrange);
         analyze_DW_AT<DW_TAG_subrange_type>(die, analyze_info_, info);
+        // boundで表現されていたらcountで要素数を作成
+        if (info.upper_bound && info.lower_bound) {
+            info.count = *(info.upper_bound) - *(info.lower_bound) + 1;
+        }
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_subrange_type");

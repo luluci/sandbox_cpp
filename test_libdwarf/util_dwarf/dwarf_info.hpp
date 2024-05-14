@@ -103,6 +103,7 @@ struct dwarf_info
         static constexpr type enum_     = 0x0800;
         static constexpr type reference = 0x1000;
         static constexpr type member    = 0x2000;  // struct,union,classのメンバ
+        static constexpr type subrange  = 0x4000;  // 配列要素数
 
         static constexpr type struct_union = struct_ | union_;
         static constexpr type func_ptr     = func | pointer;

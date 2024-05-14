@@ -85,7 +85,7 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
             //  pointerは展開しない
             //  function: 引数としてchildを持つ -> 展開しない
             if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
-                if (type.child_list != nullptr) {
+                if (type.member_list != nullptr) {
                     dump_memmap_member(type, name, depth, addr, std::forward<Func>(func));
                 }
             }
@@ -107,7 +107,7 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
         // pointerは展開しない
         // function: 引数としてchildを持つ -> 展開しない
         if ((type.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
-            if (type.child_list != nullptr) {
+            if (type.member_list != nullptr) {
                 dump_memmap_member(type, name, depth, addr, std::forward<Func>(func));
             }
         }
@@ -119,7 +119,7 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
     Dwarf_Off bit_offset = 0;
     std::string name;
 
-    for (auto &mem : *type.child_list) {
+    for (auto &mem : *type.member_list) {
         auto &member = *mem;
         std::string tag;
         if (member.sub_info != nullptr) {
@@ -146,7 +146,7 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
                     //  pointerは展開しない
                     //  function: 引数としてchildを持つ -> 展開しない
                     if ((member.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
-                        if (member.child_list != nullptr) {
+                        if (member.member_list != nullptr) {
                             dump_memmap_member(member, name, depth, address, std::forward<Func>(func));
                         }
                     }
@@ -163,7 +163,7 @@ void dump_memmap_member(util_dwarf::debug_info::type_info &type, std::string &pr
                 //  pointerは展開しない
                 //  function: 引数としてchildを持つ -> 展開しない
                 if ((member.tag & util_dwarf::debug_info::type_tag::func_ptr) == 0) {
-                    if (member.child_list != nullptr) {
+                    if (member.member_list != nullptr) {
                         dump_memmap_member(member, name, depth, address, std::forward<Func>(func));
                     }
                 }
