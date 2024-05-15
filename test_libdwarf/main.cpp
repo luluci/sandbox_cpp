@@ -229,7 +229,8 @@ int main(int argc, char *argv[]) {
         //     return;
         // });
         debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
-            printf("0x%08llX  %25s\t%lld\t%s\n", view.address, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
+            printf("0x%08llX %30s\t%lld\t%s\t[array:%d, member:%d, bitfield:%d]\n", view.address, view.tag_type->c_str(), view.byte_size,
+                   view.tag_name->c_str(), view.is_array, view.is_member, view.is_bitfield);
 
             return true;
         });

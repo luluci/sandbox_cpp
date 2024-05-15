@@ -698,6 +698,7 @@ public:
         size_t pointer_depth;
         bool is_struct;
         bool is_union;
+        bool is_member;
         bool is_array;
         bool is_bitfield;
 
@@ -714,6 +715,7 @@ public:
               pointer_depth(0),
               is_struct(false),
               is_union(false),
+              is_member(false),
               is_array(false),
               is_bitfield(false) {
         }
@@ -730,7 +732,9 @@ public:
     };
 
     void get_var_info(std::function<bool(var_info_view &)> &&func) {
-        std::string prefix = "";
+        // 本館数内のdump処理では、このvar_nameのインスタンスを使いまわす
+        // string内のバッファを維持してnew/deleteを繰り返さない
+        std::string var_name = "";
         bool result;
 
         // global_varをすべてチェック
@@ -739,8 +743,9 @@ public:
             if (var->type) {
                 auto it = type_map.find(*(var->type));
                 if (it != type_map.end()) {
-                    prefix.clear();
-                    result = lookup_var(*var, it->second, prefix, 0, func);
+                    // typeが存在するとき、変数情報のdump実行
+                    var_name.clear();
+                    result = lookup_var(*var, it->second, var_name, 0, func);
                     if (!result) {
                         break;
                     }
@@ -778,16 +783,15 @@ private:
         Dwarf_Off address;
         // 型タグ作成
         make_type_tag(view, type);
-        // 変数情報
-        // name
+        // 表示名作成
         std::format_to(std::back_inserter(var_name), "{}", *var.name);
-        // address
+        // アドレス計算
         if (var.location) {
             address = *var.location;
         } else {
             address = 0;
         }
-        // view
+        // view作成
         view.tag_name = &var_name;
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
@@ -841,9 +845,11 @@ private:
         var_info_view view;
         // 型タグ作成
         make_type_tag(view, type);
-        // 変数情報
-        view.tag_name = &var_name;
-        address       = base_address + member.data_member_location;
+        // アドレス計算
+        address = base_address + member.data_member_location;
+        // view作成
+        view.tag_name  = &var_name;
+        view.is_member = true;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();
@@ -873,10 +879,8 @@ private:
     bool lookup_var_impl_default(var_info_view &view, type_info &type, Dwarf_Off base_address, std::string &var_name, size_t depth, Func &func) {
         bool result;
 
-        // アドレス計算
-        view.address = base_address;
-        //
-        view.is_array   = true;
+        // view作成
+        view.address    = base_address;
         view.byte_size  = type.byte_size;
         view.bit_offset = 0;
         view.bit_size   = 0;
@@ -899,12 +903,12 @@ private:
         Dwarf_Off address;
         Dwarf_Unsigned bit_offset;
 
+        // アドレス計算
         address    = base_address + (type.bit_offset / 8);
         bit_offset = type.bit_offset % 8;
 
-        // アドレス計算
-        view.address = address;
-
+        // view作成
+        view.address     = address;
         view.is_bitfield = true;
         view.byte_size   = 0;
         view.bit_offset  = bit_offset;
