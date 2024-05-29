@@ -769,9 +769,14 @@ private:
         // 型情報作成
         auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::subrange);
         analyze_DW_AT<DW_TAG_subrange_type>(die, analyze_info_, info);
-        // boundで表現されていたらcountで要素数を作成
-        if (info.upper_bound && info.lower_bound) {
-            info.count = *(info.upper_bound) - *(info.lower_bound) + 1;
+        // boundで表現されていたらcountに変換
+        // lowerは0のとき省略されることがある
+        Dwarf_Unsigned lower = 0;
+        if (info.lower_bound) {
+            lower = *info.lower_bound;
+        }
+        if (info.upper_bound) {
+            info.count = *(info.upper_bound) - lower + 1;
         }
         // child dieチェックしない
         // childが存在したら表示だけ出しておく

@@ -214,7 +214,7 @@ public:
             } else if (!b->location) {
                 return false;
             } else {
-                return a->location < b->location;
+                return *a->location < *b->location;
             }
         });
         // checkする
@@ -701,6 +701,7 @@ public:
         bool is_member;
         bool is_array;
         bool is_bitfield;
+        bool is_const;
 
         var_info_view()
             : tag_type(nullptr),
@@ -717,7 +718,8 @@ public:
               is_union(false),
               is_member(false),
               is_array(false),
-              is_bitfield(false) {
+              is_bitfield(false),
+              is_const(false) {
         }
     };
 
@@ -793,6 +795,7 @@ private:
         }
         // view作成
         view.tag_name = &var_name;
+        view.is_const = type.is_const;
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
@@ -850,6 +853,7 @@ private:
         // view作成
         view.tag_name  = &var_name;
         view.is_member = true;
+        view.is_const  = type.is_const;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();
@@ -884,6 +888,7 @@ private:
         view.byte_size  = type.byte_size;
         view.bit_offset = 0;
         view.bit_size   = 0;
+        view.is_const   = type.is_const;
 
         // コールバック
         result = func(view);
@@ -913,6 +918,7 @@ private:
         view.byte_size   = 0;
         view.bit_offset  = bit_offset;
         view.bit_size    = type.bit_size;
+        view.is_const    = type.is_const;
 
         // コールバック
         result = func(view);
@@ -993,6 +999,7 @@ private:
         view.byte_size  = type.byte_size;
         view.bit_offset = 0;
         view.bit_size   = 0;
+        view.is_const   = type.is_const;
 
         // コールバック
         result = func(view);

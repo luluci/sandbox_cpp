@@ -6,6 +6,7 @@
 
 #include <optional>
 
+#include "LEB128.hpp"
 #include "dwarf_analyze_info.hpp"
 #include "utility.hpp"
 
@@ -14,6 +15,43 @@
 
 namespace util_dwarf {
 
+//
+template <typename T, typename ReturnT = std::optional<T>>
+ReturnT get_DW_FORM_block(dwarf_analyze_info &info) {
+    // blockデータ取得
+    Dwarf_Block *tempb = 0;
+    int result;
+    result = dwarf_formblock(info.dw_attr, &tempb, &info.dw_error);
+    if (result != DW_DLV_OK) {
+        utility::error_happen(&info.dw_error);
+        return std::nullopt;
+    }
+    // [ULEB128データ] + [ULEB128で示されたデータ数]
+    auto buff_ptr = static_cast<uint8_t *>(tempb->bl_data);
+    auto buff_len = tempb->bl_len;
+    // ULEB128を取得
+    ULEB128 uleb(buff_ptr, buff_len);
+    // blockを取得
+    Dwarf_Unsigned value = 0;
+    if (buff_len == (uleb.used_bytes + uleb.value)) {
+        // ULEB128が示すデータ長がblockサイズと同じならそのまま取り出す
+        // dataをlittle endianで結合
+        value = utility::concat_le<Dwarf_Unsigned>(buff_ptr, uleb.used_bytes, buff_len);
+    } else {
+        // 一致しないとき、DWARF expression として解釈
+        info.dw_expr.eval(buff_ptr, buff_len);
+        auto eval = info.dw_expr.pop<T>();
+        if (!eval) {
+            // ありえない
+            fprintf(stderr, "error: get_DW_FORM_block : DWARF expr logic error.");
+        }
+        value = *eval;
+    }
+
+    // https://www.prevanders.net/libdwarfdoc/group__examplediscrlist.html
+    dwarf_dealloc(info.dw_dbg, tempb, DW_DLA_BLOCK);
+    return ReturnT(value);
+}
 //
 template <size_t N, typename T, typename ReturnT = std::optional<T>>
 ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
@@ -135,7 +173,8 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
         case DW_FORM_ref_addr: {
             auto ret = get_DW_FORM_ref_addr(info);
             if (ret) {
-                // DW_FORM_ref_addrは相対値データとして保持する
+                // DW_FORM_ref_addrは他のCUの.debug_info の先頭からのoffset
+                // つまりどういうこと？
                 return ReturnT(ret->return_offset);
             }
         } break;
@@ -183,8 +222,7 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
         case DW_FORM_block4:
             return get_DW_FORM_block_N<4, T>(info);
         case DW_FORM_block:
-            fprintf(stderr, "no implemented! : DW_FORM_block\n");
-            break;
+            return get_DW_FORM_block<T>(info);
         case DW_FORM_block1:
             return get_DW_FORM_block_N<1, T>(info);
 
