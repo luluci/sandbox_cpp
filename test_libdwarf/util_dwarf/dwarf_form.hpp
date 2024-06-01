@@ -173,7 +173,7 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
         case DW_FORM_ref_addr: {
             auto ret = get_DW_FORM_ref_addr(info);
             if (ret) {
-                // DW_FORM_ref_addrは他のCUの.debug_info の先頭からのoffset
+                // DW_FORM_ref_addrは他のCUの.debug_info のheader offset
                 // つまりどういうこと？
                 return ReturnT(ret->return_offset);
             }
@@ -187,8 +187,8 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
             if (ret) {
                 T addr = ret->return_offset;
                 if (ret->is_info == true) {
-                    // .debug_info の先頭からのoffsetを加算する
-                    addr += info.cu_info.cu_offset;
+                    // .debug_info のheader offsetを加算する
+                    addr += info.cu_info.cu_header_offset;
                 } else {
                     // .debug_types の先頭からのoffsetを加算する
                     // 暫定：debug_typesが出現することがあるか？

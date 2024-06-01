@@ -58,8 +58,9 @@ struct dwarf_analyze_info
     Dwarf_Error dw_error;
     Dwarf_Attribute dw_attr;
     dwarf_expression dw_expr;
-    dwarf_info::compile_unit_info cu_info;
+    dwarf_info::cu_info cu_info;
     dwarf_analyze_option option;
+    std::vector<std::string> file_list;
 
     dwarf_analyze_info() : dw_dbg(nullptr), dw_error(nullptr), dw_attr(nullptr), dw_expr(), cu_info(), option() {
     }

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -117,10 +118,12 @@ public:
         analyze_machine_architecture(info);
 
         while (!finish) {
+            // init
+            analyze_info_.file_list.clear();
             // compile_unit取得
             // ヘッダ情報が一緒に返される
             // ★cu_infoは使い捨てている。必要に応じてinfo.cu_infoに保持する
-            analyze_info_.cu_info = dwarf_info::compile_unit_info();
+            analyze_info_.cu_info = dwarf_info::cu_info();
             auto &cu_info         = analyze_info_.cu_info;
             result = dwarf_next_cu_header_e(dw_dbg, dw_is_info, &dw_cu_die, &cu_info.cu_header_length, &cu_info.version_stamp, &cu_info.abbrev_offset,
                                             &cu_info.address_size, &cu_info.length_size, &cu_info.extension_size, &cu_info.type_signature,
@@ -146,6 +149,14 @@ public:
             }
             // オフセットを取得
             result = dwarf_CU_dieoffset_given_die(dw_cu_die, &cu_info.cu_offset, &dw_error);
+            if (result != DW_DLV_OK) {
+                /*  FAIL */
+                // return result;
+                utility::error_happen(&dw_error);
+                return;
+            }
+            // headerオフセット
+            result = dwarf_die_CU_offset_range(dw_cu_die, &cu_info.cu_header_offset, &cu_info.cu_length, &dw_error);
             if (result != DW_DLV_OK) {
                 /*  FAIL */
                 // return result;
@@ -195,12 +206,10 @@ private:
     }
 
     void analyze_cu(Dwarf_Die dw_cu_die, dwarf_info &info) {
+        // .debug_line解析
+        analyze_debug_line(dw_cu_die);
         // 先にcompile_unitの情報を取得
         analyze_die_TAG_compile_unit(dw_cu_die, info);
-
-        // .debug_line解析
-        // 必要になったら実装
-        // analyze_debug_line(dw_cu_die);
 
         // https://www.prevanders.net/libdwarfdoc/group__examplecuhdre.html
 
@@ -315,21 +324,25 @@ private:
         }
         // DW_DLV_OK, DW_DLV_NO_ENTRYなら次へ
 
-        // 暫定：値取り出し
+        // file list取得
+        // 1から始まるので0にダミーを入れておく
+        analyze_info_.file_list.reserve(count);
+        analyze_info_.file_list.push_back(std::string());
         for (i = 0; i < count; ++i) {
-            Dwarf_Signed propernumber = 0;
-
             /*  Use srcfiles[i] If you  wish to print 'i'
                 mostusefully
                 you should reflect the numbering that
                 a DW_AT_decl_file attribute would report in
                 this CU. */
-            if (lineversion == 5) {
-                propernumber = i;
-            } else {
-                propernumber = i + 1;
-            }
-            fprintf(stderr, "File %4ld %s\n", static_cast<unsigned long>(propernumber), srcfiles[i]);
+            // Dwarf_Signed propernumber = 0;
+            // if (lineversion == 5) {
+            //     propernumber = i;
+            // } else {
+            //     propernumber = i + 1;
+            // }
+            // fprintf(stderr, "File %4ld %s\n", static_cast<unsigned long>(propernumber), srcfiles[i]);
+            analyze_info_.file_list.push_back(srcfiles[i]);
+
             dwarf_dealloc(dw_dbg, srcfiles[i], DW_DLA_STRING);
             srcfiles[i] = 0;
         }
@@ -500,7 +513,17 @@ private:
     // auto analyze_DW_TAG(Dwarf_Die die, die_info_t &die_info) -> std::enable_if_t<Tag == 0> {
     // }
 
-    void analyze_die_TAG_compile_unit(Dwarf_Die, dwarf_info &) {
+    void analyze_die_TAG_compile_unit(Dwarf_Die die, dwarf_info &) {
+        // cu情報取得
+        analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, analyze_info_.cu_info);
+        // fileチェック
+        for (size_t i = 1; i < analyze_info_.file_list.size(); i++) {
+            std::filesystem::path p_fl(analyze_info_.file_list[i]);
+            std::filesystem::path p_cu(analyze_info_.cu_info.name);
+            if (p_fl.filename() == p_cu.filename()) {
+                analyze_info_.cu_info.decl_file_id = i;
+            }
+        }
     }
 
     void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t & /*die_info*/) {

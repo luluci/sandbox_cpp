@@ -33,6 +33,7 @@ struct dwarf_info
     struct var_info
     {
         std::string name;
+        std::string linkage_name;
         bool external;
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         bool decl_file_is_external;
@@ -47,6 +48,7 @@ struct dwarf_info
 
         var_info()
             : name(),
+              linkage_name(),
               external(false),
               decl_file(0),
               decl_file_is_external(false),
@@ -192,7 +194,7 @@ struct dwarf_info
     };
 
     // compile_unitから取得する情報
-    struct compile_unit_info
+    struct cu_info
     {
         // compile_unit info
         Dwarf_Unsigned cu_header_length;
@@ -207,8 +209,19 @@ struct dwarf_info
         Dwarf_Half header_cu_type;
         //
         Dwarf_Off cu_offset;
+        Dwarf_Off cu_header_offset;
+        Dwarf_Off cu_length;
+        // DW_AT_* info
+        std::string name;
+        size_t decl_file_id;  // file_list上の番号
+        std::string producer;
+        Dwarf_Unsigned language;
+        Dwarf_Off stmt_list;
+        std::string comp_dir;
+        Dwarf_Unsigned low_pc;
+        Dwarf_Unsigned high_pc;
 
-        compile_unit_info()
+        cu_info()
             : cu_header_length(0),
               version_stamp(0),
               abbrev_offset(0),
@@ -219,7 +232,17 @@ struct dwarf_info
               typeoffset(0),
               next_cu_header_offset(0),
               header_cu_type(0),
-              cu_offset(0) {
+              cu_offset(0),
+              cu_header_offset(0),
+              cu_length(0),
+              name(),
+              decl_file_id(0),
+              producer(),
+              language(),
+              stmt_list(0),
+              comp_dir(),
+              low_pc(0),
+              high_pc(0) {
         }
     };
 
@@ -232,7 +255,7 @@ struct dwarf_info
     type_info_container type_tbl;
 
     // 必要ならバッファするように変更
-    // compile_unit_info cu_info;
+    // cu_info_container cu_tbl;
 
     dwarf_info() : machine_arch(), arch_info(nullptr) {
     }
