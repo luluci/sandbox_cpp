@@ -558,7 +558,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::base);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::base;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_base_type>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
@@ -572,7 +575,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::enum_);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::enum_;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_enumeration_type>(die, analyze_info_, info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
@@ -609,7 +615,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::enum_);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::enum_;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_enumerator>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
@@ -632,7 +641,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, tag);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= tag;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG>(die, analyze_info_, info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
@@ -713,7 +725,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::member);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::member;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_member>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
@@ -726,7 +741,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::array);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::array;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_array_type>(die, analyze_info_, info);
         // omitチェック
         check_omitted_type_info(info);
@@ -774,7 +792,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::subrange);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::subrange;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_subrange_type>(die, analyze_info_, info);
         // boundで表現されていたらcountに変換
         // lowerは0のとき省略されることがある
@@ -801,7 +822,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::func);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::func;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_subroutine_type>(die, analyze_info_, info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
@@ -838,7 +862,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::parameter);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::parameter;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_formal_parameter>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
@@ -852,7 +879,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::reference);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::reference;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_reference_type>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
@@ -865,7 +895,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, tag);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= tag;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
@@ -877,7 +910,10 @@ private:
         // DIE offset取得
         Dwarf_Off offset = get_die_offset(die);
         // 型情報作成
-        auto &info = dw_info.type_tbl.make_new_type_info(offset, type_tag::typedef_);
+        auto &&info = dw_info.type_tbl.make_new_info(offset);
+        info.tag |= type_tag::typedef_;
+        info.offset = offset;
+
         analyze_DW_AT<DW_TAG_typedef>(die, analyze_info_, info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく

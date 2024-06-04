@@ -63,48 +63,6 @@ struct dwarf_info
         }
     };
 
-    // 変数情報リスト
-    // class var_info_container {
-    // public:
-    //     // type def
-    //     using var_map_node_t = std::unique_ptr<var_info>;
-    //     using var_map_t      = std::map<Dwarf_Off, var_map_node_t>;
-
-    //     var_map_t var_map;
-
-    // public:
-    //     var_info_container() {
-    //     }
-
-    //     // var_map操作関数
-    //     var_map_node_t make_new_var_info() {
-    //         return std::make_unique<var_info>();
-    //     }
-    //     void add(Dwarf_Off die_offset, var_map_node_t &&node) {
-    //         var_map.insert(std::make_pair(die_offset, std::move(node)));
-    //     }
-    // };
-
-    template <typename T>
-    class info_container {
-    public:
-        // 型情報
-        using container_t = std::map<Dwarf_Off, T>;
-        container_t container;
-
-    public:
-        info_container() : container() {
-        }
-
-        // type_map操作関数
-        T &make_new_info(Dwarf_Off offset) {
-            auto result = container.try_emplace(offset, T());
-            return result.first->second;
-        }
-    };
-    //
-    using var_info_container = info_container<var_info>;
-
     // 型タグ
     struct type_tag
     {
@@ -192,26 +150,28 @@ struct dwarf_info
         }
     };
 
-    // 型情報リスト
-    class type_info_container {
+    // 情報コンテナ
+    template <typename T>
+    class info_container {
     public:
         // 型情報
-        using type_map_t = std::map<Dwarf_Off, type_info>;
-
-        type_map_t type_map;
+        using container_t = std::map<Dwarf_Off, T>;
+        container_t container;
 
     public:
-        type_info_container() {
+        info_container() : container() {
         }
 
         // type_map操作関数
-        type_info &make_new_type_info(Dwarf_Off offset, type_tag::type tag) {
-            auto result = type_map.try_emplace(offset, type_info());
-            result.first->second.tag |= tag;
-            result.first->second.offset = offset;
+        T &make_new_info(Dwarf_Off offset) {
+            auto result = container.try_emplace(offset, T());
             return result.first->second;
         }
     };
+    // 変数情報リスト
+    using var_info_container = info_container<var_info>;
+    // 型情報リスト
+    using type_info_container = info_container<type_info>;
 
     // compile_unitから取得する情報
     struct cu_info

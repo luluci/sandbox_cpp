@@ -216,7 +216,7 @@ public:
     void build_type_info() {
         // DIEから収集したデータは木構造で情報が分散している
         // ルートオブジェクトに情報を集約して型情報を単一にする
-        auto &dw_type_map = dw_info_.type_tbl.type_map;
+        auto &dw_type_map = dw_info_.type_tbl.container;
 
         for (auto &elem : dw_type_map) {
             // 集約ノード取得
@@ -256,7 +256,7 @@ private:
     }
 
     void build_type_info(type_info &dbg_info, Dwarf_Unsigned offset) {
-        auto &dw_type_map = dw_info_.type_tbl.type_map;
+        auto &dw_type_map = dw_info_.type_tbl.container;
         // 開始ノード存在チェック
         auto it = dw_type_map.find(offset);
         if (it == dw_type_map.end()) {
