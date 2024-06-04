@@ -58,51 +58,52 @@ struct dwarf_info
               declaration(false),
               const_value(0),
               sibling(0),
-              endianity(0) {
+              endianity(0),
+              specification() {
         }
     };
 
     // 変数情報リスト
-    class var_info_container {
-    public:
-        // type def
-        using var_map_node_t = std::unique_ptr<var_info>;
-        using var_map_t      = std::map<Dwarf_Off, var_map_node_t>;
-
-        var_map_t var_map;
-
-    public:
-        var_info_container() {
-        }
-
-        // var_map操作関数
-        var_map_node_t make_new_var_info() {
-            return std::make_unique<var_info>();
-        }
-        void add(Dwarf_Off die_offset, var_map_node_t &&node) {
-            var_map.insert(std::make_pair(die_offset, std::move(node)));
-        }
-    };
-
-    // template <typename T>
-    // class info_container {
+    // class var_info_container {
     // public:
-    //     // 型情報
-    //     using container_t = std::map<Dwarf_Off, T>;
-    //     container_t container;
+    //     // type def
+    //     using var_map_node_t = std::unique_ptr<var_info>;
+    //     using var_map_t      = std::map<Dwarf_Off, var_map_node_t>;
+
+    //     var_map_t var_map;
 
     // public:
-    //     info_container() : container() {
+    //     var_info_container() {
     //     }
 
-    //     // type_map操作関数
-    //     T &make_new_info(Dwarf_Off offset) {
-    //         auto result = container.try_emplace(offset, T());
-    //         return result.first->second;
+    //     // var_map操作関数
+    //     var_map_node_t make_new_var_info() {
+    //         return std::make_unique<var_info>();
+    //     }
+    //     void add(Dwarf_Off die_offset, var_map_node_t &&node) {
+    //         var_map.insert(std::make_pair(die_offset, std::move(node)));
     //     }
     // };
-    // //
-    // using var_info_container = info_container<var_info>;
+
+    template <typename T>
+    class info_container {
+    public:
+        // 型情報
+        using container_t = std::map<Dwarf_Off, T>;
+        container_t container;
+
+    public:
+        info_container() : container() {
+        }
+
+        // type_map操作関数
+        T &make_new_info(Dwarf_Off offset) {
+            auto result = container.try_emplace(offset, T());
+            return result.first->second;
+        }
+    };
+    //
+    using var_info_container = info_container<var_info>;
 
     // 型タグ
     struct type_tag

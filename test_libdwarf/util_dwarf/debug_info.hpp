@@ -195,18 +195,18 @@ public:
     }
     void build_var_info() {
         // ソート用に変数リストへのポインタをリストアップする
-        auto &dw_var_tbl = dw_info_.global_var_tbl.var_map;
+        auto &dw_var_tbl = dw_info_.global_var_tbl.container;
         for (auto &[offset, elem] : dw_var_tbl) {
             // location(address)を持っている変数を対象とする
-            if ((*elem).location) {
-                auto addr = *(*elem).location;
+            if (elem.location) {
+                auto addr = *elem.location;
 
                 // DWARF上で同じ変数が複数のCU上に出現することがある
                 // 重複になるので除外する
                 if (!global_var_tbl.contains(addr)) {
                     // dwarf_infoからデータコピー
                     auto info = std::make_unique<var_info>();
-                    info->copy(*elem);
+                    info->copy(elem);
                     // map追加
                     global_var_tbl.insert(std::make_pair(addr, std::move(info)));
                 }

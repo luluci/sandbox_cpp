@@ -320,6 +320,16 @@ void get_DW_AT_sibling(dwarf_analyze_info &dw_info, T &info) {
         info.sibling = 0;
     }
 }
+
+// DW_AT_specification
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_specification(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
+    if (result) {
+        info.specification = *result;
+    }
+}
+
 // DW_AT_type
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_type(dwarf_analyze_info &dw_info, T &info) {
@@ -598,7 +608,14 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
         case DW_AT_namelist_item:
         case DW_AT_priority:
         case DW_AT_segment:
+            break;
+
         case DW_AT_specification:
+            if constexpr (std::is_same_v<T, dwarf_info::var_info>) {
+                get_DW_AT_specification<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_static_link:
             break;
 
