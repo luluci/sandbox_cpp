@@ -43,7 +43,8 @@ struct dwarf_info
         bool declaration;  // 不完全型のときtrue
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
-        Dwarf_Unsigned endianity;  // DW_END_*
+        Dwarf_Unsigned endianity;                // DW_END_*
+        std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
 
         var_info()
             : name(),
@@ -136,6 +137,7 @@ struct dwarf_info
         std::optional<Dwarf_Unsigned> address_class;
         Dwarf_Unsigned encoding;   // DW_ATE_*
         Dwarf_Unsigned endianity;  // DW_END_*
+        bool prototyped;
 
         // memberも単体でtype_mapに登録するのでchild_listは参照用のポインタでいい
         using child_node_t = type_info *;
@@ -164,6 +166,7 @@ struct dwarf_info
               accessibility(0),
               encoding(0),
               endianity(0),
+              prototyped(false),
               has_bitfield(false) {
         }
     };
@@ -215,6 +218,7 @@ struct dwarf_info
         std::string comp_dir;
         Dwarf_Unsigned low_pc;
         Dwarf_Unsigned high_pc;
+        Dwarf_Unsigned ranges;  // .debug_rangesへの参照
 
         cu_info()
             : cu_header_length(0),

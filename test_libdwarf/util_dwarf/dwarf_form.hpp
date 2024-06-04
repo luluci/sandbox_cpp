@@ -204,14 +204,16 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
         case DW_FORM_sec_offset: {
             auto ret = get_DW_FORM_sec_offset(info);
             if (ret) {
+                // DW_AT_* に該当するセクションの先頭からのoffset
+                // ここでは何も加算しない
                 T addr = ret->return_offset;
                 if (ret->is_info == true) {
                     // .debug_info の先頭からのoffsetを加算する
-                    addr += info.cu_info.cu_offset;
+                    // addr += info.cu_info.cu_header_offset;
                 } else {
                     // .debug_types の先頭からのoffsetを加算する
                     // 暫定：debug_typesが出現することがあるか？
-                    addr += info.cu_info.cu_offset;
+                    // addr += info.cu_info.cu_offset;
                 }
                 return ReturnT(addr);
             }

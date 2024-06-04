@@ -233,6 +233,18 @@ void get_DW_AT_producer(dwarf_analyze_info &dw_info, T &info) {
     info.producer = str;
 }
 
+// DW_AT_prototyped
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_prototyped(dwarf_analyze_info &dw_info, T &info) {
+    Dwarf_Bool returned_bool = 0;
+    int result;
+    result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
+    if (result != DW_DLV_OK) {
+        utility::error_happen(&dw_info.dw_error);
+    }
+    info.prototyped = (returned_bool == 1);
+}
+
 // DW_AT_count
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_count(dwarf_analyze_info &dw_info, T &info) {
@@ -323,6 +335,17 @@ void get_DW_AT_endianity(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
         info.type = *result;
+    }
+}
+
+// DW_AT_ranges
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_ranges(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
+    if (result) {
+        info.ranges = *result;
+    } else {
+        info.ranges = 0;
     }
 }
 
@@ -482,6 +505,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_prototyped:
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
+                get_DW_AT_prototyped<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_return_addr:
         case DW_AT_start_scope:
         case DW_AT_bit_stride:
@@ -591,7 +619,14 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
         case DW_AT_entry_pc:
         case DW_AT_use_UTF8:
         case DW_AT_extension:
+            break;
+
         case DW_AT_ranges:
+            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+                get_DW_AT_ranges<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_trampoline:
         case DW_AT_call_column:
         case DW_AT_call_file:
