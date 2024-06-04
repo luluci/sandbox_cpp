@@ -26,9 +26,10 @@ public:
     struct die_info_t
     {
         // 共通情報
-        Dwarf_Half tag;  // DIE tag(DW_TAG_*)
+        Dwarf_Half tag;    // DIE tag(DW_TAG_*)
+        Dwarf_Off offset;  // DIE offset
 
-        die_info_t(Dwarf_Half tag_) : tag(tag_) {
+        die_info_t(Dwarf_Half tag_, Dwarf_Off offset_) : tag(tag_), offset(offset_) {
         }
     };
 
@@ -353,18 +354,30 @@ private:
         return;
     }
 
-    void analyze_die(Dwarf_Die die, dwarf_info &info) {
-        // DIEを解析して情報取得する
-        // ★die_infoは使い捨てにしている。必要に応じて保持するように変更する
-        // die_infoを構築したらTAGに応じて変数情報、型情報に変換して記憶する
+    die_info_t make_die_info(Dwarf_Die die) {
         int result;
         Dwarf_Half tag;
         result = dwarf_tag(die, &tag, &dw_error);
         if (result != DW_DLV_OK) {
             utility::error_happen(&dw_error);
         }
+        // Dwarf_Off offset;
+        // result = dwarf_dieoffset(die, &offset, &dw_error);
+        // if (result != DW_DLV_OK) {
+        //     utility::error_happen(&dw_error);
+        // }
+        // DIE offset取得
+        Dwarf_Off offset = get_die_offset(die);
 
-        auto die_info = die_info_t(tag);
+        return die_info_t(tag, offset);
+    }
+
+    void analyze_die(Dwarf_Die die, dwarf_info &info) {
+        // DIEを解析して情報取得する
+        // ★die_infoは使い捨てにしている。必要に応じて保持するように変更する
+        // die_infoを構築したらTAGに応じて変数情報、型情報に変換して記憶する
+
+        auto die_info = make_die_info(die);
 
         switch (die_info.tag) {
             case DW_TAG_compile_unit:
@@ -517,7 +530,7 @@ private:
         analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, analyze_info_.cu_info);
     }
 
-    void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t & /*die_info*/) {
+    void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // 変数情報作成
         auto info = dw_info.global_var_tbl.make_new_var_info();
         analyze_DW_AT<DW_TAG_variable>(die, analyze_info_, *info);
@@ -536,7 +549,7 @@ private:
             // 名前を持たない
         } else {
             // アドレスを持っているとグローバル変数
-            dw_info.global_var_tbl.add(std::move(info));
+            dw_info.global_var_tbl.add(die_info.offset, std::move(info));
         }
     }
 
@@ -571,15 +584,8 @@ private:
         }
     }
     void analyze_DW_TAG_enumeration_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_info &parent_type) {
-        int result;
-        Dwarf_Half tag;
-        result = dwarf_tag(die, &tag, &dw_error);
-        if (result != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
-
         // DW_TAG_subroutine_typeのchildとして出現するDW_TAG_*を処理する
-        auto die_info = die_info_t(tag);
+        auto die_info = make_die_info(die);
         switch (die_info.tag) {
             case DW_TAG_enumerator: {
                 // member情報を作成
@@ -639,15 +645,8 @@ private:
     }
     template <Dwarf_Half DW_TAG>
     void analyze_DW_TAG_struct_union_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_info &parent_type) {
-        int result;
-        Dwarf_Half tag;
-        result = dwarf_tag(die, &tag, &dw_error);
-        if (result != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
-
         // struct/unionのchildとして出現するDW_TAG_*を処理する
-        auto die_info = die_info_t(tag);
+        auto die_info = make_die_info(die);
         switch (die_info.tag) {
             case DW_TAG_member: {
                 // member情報を作成
@@ -742,15 +741,8 @@ private:
     }
 
     void analyze_DW_TAG_array_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t & /*parent_die_info*/, type_info &parent_type) {
-        int result;
-        Dwarf_Half tag;
-        result = dwarf_tag(die, &tag, &dw_error);
-        if (result != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
-
         // DW_TAG_array_typeのchildとして出現するDW_TAG_*を処理する
-        auto die_info = die_info_t(tag);
+        auto die_info = make_die_info(die);
         switch (die_info.tag) {
             case DW_TAG_subrange_type: {
                 // subrange情報を作成
@@ -821,15 +813,8 @@ private:
         }
     }
     void analyze_DW_TAG_subroutine_type_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, type_info &parent_type) {
-        int result;
-        Dwarf_Half tag;
-        result = dwarf_tag(die, &tag, &dw_error);
-        if (result != DW_DLV_OK) {
-            utility::error_happen(&dw_error);
-        }
-
         // DW_TAG_subroutine_typeのchildとして出現するDW_TAG_*を処理する
-        auto die_info = die_info_t(tag);
+        auto die_info = make_die_info(die);
         switch (die_info.tag) {
             case DW_TAG_formal_parameter: {
                 // member情報を作成

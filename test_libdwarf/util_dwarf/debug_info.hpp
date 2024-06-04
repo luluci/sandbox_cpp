@@ -195,8 +195,8 @@ public:
     }
     void build_var_info() {
         // ソート用に変数リストへのポインタをリストアップする
-        auto &dw_var_list = dw_info_.global_var_tbl.var_list;
-        for (auto &elem : dw_var_list) {
+        auto &dw_var_tbl = dw_info_.global_var_tbl.var_map;
+        for (auto &[offset, elem] : dw_var_tbl) {
             // location(address)を持っている変数を対象とする
             if ((*elem).location) {
                 auto addr = *(*elem).location;

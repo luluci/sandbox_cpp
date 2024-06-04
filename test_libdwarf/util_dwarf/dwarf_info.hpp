@@ -66,23 +66,43 @@ struct dwarf_info
     class var_info_container {
     public:
         // type def
-        using var_list_node_t = std::unique_ptr<var_info>;
-        using var_list_t      = std::vector<var_list_node_t>;
+        using var_map_node_t = std::unique_ptr<var_info>;
+        using var_map_t      = std::map<Dwarf_Off, var_map_node_t>;
 
-        var_list_t var_list;
+        var_map_t var_map;
 
     public:
         var_info_container() {
         }
 
-        // var_list操作関数
-        var_list_node_t make_new_var_info() {
+        // var_map操作関数
+        var_map_node_t make_new_var_info() {
             return std::make_unique<var_info>();
         }
-        void add(var_list_node_t &&node) {
-            var_list.push_back(std::move(node));
+        void add(Dwarf_Off die_offset, var_map_node_t &&node) {
+            var_map.insert(std::make_pair(die_offset, std::move(node)));
         }
     };
+
+    // template <typename T>
+    // class info_container {
+    // public:
+    //     // 型情報
+    //     using container_t = std::map<Dwarf_Off, T>;
+    //     container_t container;
+
+    // public:
+    //     info_container() : container() {
+    //     }
+
+    //     // type_map操作関数
+    //     T &make_new_info(Dwarf_Off offset) {
+    //         auto result = container.try_emplace(offset, T());
+    //         return result.first->second;
+    //     }
+    // };
+    // //
+    // using var_info_container = info_container<var_info>;
 
     // 型タグ
     struct type_tag
