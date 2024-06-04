@@ -65,7 +65,6 @@ public:
         std::string *name;
         bool external;
         Dwarf_Unsigned decl_file;  // filelistのインデックス
-        bool decl_file_is_external;
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         bool declaration;  // 不完全型のときtrue
@@ -79,7 +78,6 @@ public:
             : name(nullptr),
               external(false),
               decl_file(0),
-              decl_file_is_external(false),
               decl_line(0),
               decl_column(0),
               declaration(false),
@@ -92,16 +90,15 @@ public:
 
         void copy(dwarf_info::var_info &info) {
             // dwarf_infoから必要な情報をコピーする
-            name                  = &(info.name);
-            external              = info.external;
-            decl_file             = info.decl_file;
-            decl_file_is_external = info.decl_file_is_external;
-            decl_line             = info.decl_line;
-            decl_column           = info.decl_column;
-            declaration           = info.declaration;
-            const_value           = info.const_value;
-            sibling               = info.sibling;
-            endianity             = info.endianity;
+            name        = &(info.name);
+            external    = info.external;
+            decl_file   = info.decl_file;
+            decl_line   = info.decl_line;
+            decl_column = info.decl_column;
+            declaration = info.declaration;
+            const_value = info.const_value;
+            sibling     = info.sibling;
+            endianity   = info.endianity;
             if (info.type)
                 type = *info.type;
             if (info.location)
@@ -170,9 +167,9 @@ public:
 
     // 変数情報
     // using var_info = dwarf_info::var_info;
-    using var_list_node_t = std::unique_ptr<var_info>;
-    using var_list_t      = std::vector<var_list_node_t>;
-    var_list_t global_var_tbl;
+    using var_map_node_t = std::unique_ptr<var_info>;
+    using var_map_t      = std::map<Dwarf_Off, var_map_node_t>;
+    var_map_t global_var_tbl;
     // 型情報
     using type_map_t = std::map<Dwarf_Unsigned, type_info>;
     type_map_t type_map;
@@ -190,7 +187,6 @@ private:
 
 public:
     debug_info(dwarf_info &dw_info, option opt) : name_void("void"), dw_info_(dw_info), opt_(opt) {
-        global_var_tbl.reserve(dw_info.global_var_tbl.var_list.size());
     }
 
     void build() {
@@ -201,36 +197,19 @@ public:
         // ソート用に変数リストへのポインタをリストアップする
         auto &dw_var_list = dw_info_.global_var_tbl.var_list;
         for (auto &elem : dw_var_list) {
-            // dwarf_infoからデータコピー
-            auto info = std::make_unique<var_info>();
-            info->copy(*elem);
-            // list追加
-            global_var_tbl.push_back(std::move(info));
-        }
-        // ソートする
-        std::sort(global_var_tbl.begin(), global_var_tbl.end(), [](auto &a, auto &b) -> bool {
-            if (!a->location) {
-                return true;
-            } else if (!b->location) {
-                return false;
-            } else {
-                return *a->location < *b->location;
-            }
-        });
-        // checkする
-        bool is_del;
-        auto it = global_var_tbl.begin();
-        while (it != global_var_tbl.end()) {
-            is_del = false;
-            // 削除対象をチェック
-            if ((*it)->decl_file_is_external) {
-                is_del = true;
-            }
-            // 削除
-            if (is_del) {
-                it = global_var_tbl.erase(it);
-            } else {
-                it++;
+            // location(address)を持っている変数を対象とする
+            if ((*elem).location) {
+                auto addr = *(*elem).location;
+
+                // DWARF上で同じ変数が複数のCU上に出現することがある
+                // 重複になるので除外する
+                if (!global_var_tbl.contains(addr)) {
+                    // dwarf_infoからデータコピー
+                    auto info = std::make_unique<var_info>();
+                    info->copy(*elem);
+                    // map追加
+                    global_var_tbl.insert(std::make_pair(addr, std::move(info)));
+                }
             }
         }
     }
@@ -247,7 +226,7 @@ public:
     }
 
     void memmap(std::function<void(var_info &, type_info &)> &&func) {
-        for (auto &var : global_var_tbl) {
+        for (auto &[addr, var] : global_var_tbl) {
             if (var->type) {
                 auto it = type_map.find(*(var->type));
                 if (it != type_map.end()) {
@@ -740,7 +719,7 @@ public:
         bool result;
 
         // global_varをすべてチェック
-        for (auto &var : global_var_tbl) {
+        for (auto &[addr, var] : global_var_tbl) {
             // 対応するtypeを取得
             if (var->type) {
                 auto it = type_map.find(*(var->type));

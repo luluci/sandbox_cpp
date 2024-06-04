@@ -270,8 +270,7 @@ void get_DW_AT_decl_file(dwarf_analyze_info &dw_info, T &info) {
     if (result) {
         // index==1がデフォルトでソースファイルになるはずだが、そうでないこともある
         // CU情報内ファイル名が対応するindexとdecl_fileが同じなら自CU内で定義されたとみなす
-        info.decl_file             = *result;
-        info.decl_file_is_external = (info.decl_file != dw_info.cu_info.decl_file_id);
+        info.decl_file = *result;
     } else {
         info.decl_file = 0;
     }

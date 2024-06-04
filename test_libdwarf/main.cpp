@@ -63,9 +63,6 @@ void dump_memmap(util_dwarf::debug_info::var_info &var, util_dwarf::debug_info::
     //
     std::string name;
     //
-    if (var.decl_file_is_external) {
-        return;
-    }
 
     func(var, type);
 

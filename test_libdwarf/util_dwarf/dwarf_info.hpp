@@ -36,7 +36,6 @@ struct dwarf_info
         std::string linkage_name;
         bool external;
         Dwarf_Unsigned decl_file;  // filelistのインデックス
-        bool decl_file_is_external;
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         std::optional<Dwarf_Off> type;  // reference
@@ -51,7 +50,6 @@ struct dwarf_info
               linkage_name(),
               external(false),
               decl_file(0),
-              decl_file_is_external(false),
               decl_line(0),
               decl_column(0),
               type(),
@@ -118,7 +116,6 @@ struct dwarf_info
 
         std::string name;
         Dwarf_Unsigned decl_file;  // filelistのインデックス
-        bool decl_file_is_external;
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         Dwarf_Unsigned sibling;
@@ -152,7 +149,6 @@ struct dwarf_info
             : tag(0),
               name(),
               decl_file(0),
-              decl_file_is_external(false),
               decl_line(0),
               decl_column(0),
               sibling(0),
@@ -213,7 +209,6 @@ struct dwarf_info
         Dwarf_Off cu_length;
         // DW_AT_* info
         std::string name;
-        size_t decl_file_id;  // file_list上の番号
         std::string producer;
         Dwarf_Unsigned language;
         Dwarf_Off stmt_list;
@@ -236,7 +231,6 @@ struct dwarf_info
               cu_header_offset(0),
               cu_length(0),
               name(),
-              decl_file_id(0),
               producer(),
               language(),
               stmt_list(0),

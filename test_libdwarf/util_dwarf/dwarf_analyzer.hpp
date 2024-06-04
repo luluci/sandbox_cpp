@@ -6,7 +6,6 @@
 
 #include <cstdint>
 #include <cstdio>
-#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -516,14 +515,6 @@ private:
     void analyze_die_TAG_compile_unit(Dwarf_Die die, dwarf_info &) {
         // cu情報取得
         analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, analyze_info_.cu_info);
-        // fileチェック
-        for (size_t i = 1; i < analyze_info_.file_list.size(); i++) {
-            std::filesystem::path p_fl(analyze_info_.file_list[i]);
-            std::filesystem::path p_cu(analyze_info_.cu_info.name);
-            if (p_fl.filename() == p_cu.filename()) {
-                analyze_info_.cu_info.decl_file_id = i;
-            }
-        }
     }
 
     void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t & /*die_info*/) {
@@ -800,6 +791,10 @@ private:
         }
         if (info.upper_bound) {
             info.count = *(info.upper_bound) - lower + 1;
+        }
+        // 情報が無い場合サイズ0？
+        if (!info.count) {
+            info.count = 0;
         }
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
