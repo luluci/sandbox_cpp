@@ -10,14 +10,17 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/test_libdwarf.exe", // <- test.exe
             "args": [
-                "${workspaceFolder}/abs_test.abs"
+                "${workspaceFolder}/test_build_arm_gcc.out",
+                "${workspaceFolder}/test_build_esp32s3.out",
+                "${workspaceFolder}/dwarf_test_clang.out",
+                "${workspaceFolder}/abs_test_RX.abs"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": true, // <- true
             "MIMode": "gdb",
-            "miDebuggerPath": "D:/msys64/mingw64/bin/gdb.exe", // <- フルパス
+            "miDebuggerPath": "D:/msys64/ucrt64/bin/gdb.exe", // <- フルパス
             "setupCommands": [
                 {
                     "description": "gdb の再フォーマットを有効にする",

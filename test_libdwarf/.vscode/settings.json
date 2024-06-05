@@ -49,21 +49,30 @@
         "ostream": "cpp",
         "stdexcept": "cpp",
         "streambuf": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "charconv": "cpp",
+        "ctime": "cpp",
+        "format": "cpp",
+        "span": "cpp",
+        "variant": "cpp",
+        "codecvt": "cpp",
+        "ratio": "cpp",
+        "iomanip": "cpp",
+        "sstream": "cpp"
     },
-    "C_Cpp.default.compilerPath": "D:\\msys64\\mingw64\\bin\\g++.exe",
+    "C_Cpp.default.compilerPath": "D:\\msys64\\ucrt64\\bin\\g++.exe",
     "cmake.buildDirectory": "${workspaceFolder}/build",
-    "cmake.cmakePath": "D:\\msys64\\mingw64\\bin\\cmake.exe",
+    "cmake.cmakePath": "D:\\msys64\\ucrt64\\bin\\cmake.exe",
     "cmake.generator": "Ninja",
     "cmake.configureSettings": {
-        "CMAKE_MAKE_PROGRAM": "D:/msys64/mingw64/bin/ninja.exe"
+        "CMAKE_MAKE_PROGRAM": "D:/msys64/ucrt64/bin/ninja.exe"
     },
     "cmake.additionalCompilerSearchDirs": [
-        "D:\\msys64\\mingw64\\bin"
+        "D:\\msys64\\ucrt64\\bin"
     ],
     "C_Cpp.default.systemIncludePath": [
         "D:\\msys64\\usr\\local\\libdwarf_092\\include",
-        "D:\\msys64\\mingw64\\include\\c++\\13.2.0"
+        "D:\\msys64\\ucrt64\\include\\c++\\13.2.0"
     ],
     "editor.formatOnSave": true
 }
