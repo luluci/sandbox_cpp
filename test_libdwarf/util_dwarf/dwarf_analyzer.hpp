@@ -524,7 +524,7 @@ private:
         analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, analyze_info_.cu_info);
     }
 
-    void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
+    Dwarf_Off analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // 変数情報作成
         auto &&info = dw_info.var_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_variable>(die, analyze_info_, info);
@@ -546,6 +546,8 @@ private:
                 }
             }
         }
+
+        return die_info.offset;
     }
 
     void analyze_DW_TAG_base_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
@@ -836,10 +838,10 @@ private:
         auto die_info = make_die_info(die);
         switch (die_info.tag) {
             case DW_TAG_formal_parameter: {
-                // member情報を作成
-                auto mem_info = analyze_DW_TAG_formal_parameter(die, dw_info, die_info);
+                // parameterを作成
+                auto param = analyze_DW_TAG_formal_parameter(die, dw_info, die_info);
                 // parentのchildにparameterとして登録
-                parent_type.child_list.push_back(std::move(mem_info));
+                parent_type.param_list.push_back(param);
                 return;
             }
 
@@ -851,21 +853,34 @@ private:
         dwarf_get_TAG_name(die_info.tag, &name);
         fprintf(stderr, "no impl : DW_TAG_subroutine_type child : %s (%u)\n", name, die_info.tag);
     }
-    // DW_TAG_formal_parameter
-    type_child analyze_DW_TAG_formal_parameter(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {
-        // DIE offset取得
-        Dwarf_Off offset = get_die_offset(die);
-        // 型情報作成
-        auto &&info = dw_info.type_tbl.make_new_info(offset);
-        info.tag |= type_tag::parameter;
-        info.offset = offset;
 
+    // DW_TAG_formal_parameter
+    Dwarf_Off analyze_DW_TAG_formal_parameter(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
+        // parameter変数情報
+        // 現状で DW_TAG_variable と同等
+        // 変数情報作成
+        auto &&info = dw_info.var_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_formal_parameter>(die, analyze_info_, info);
+        // decl_fileチェック
+        if (info.decl_file > 0) {
+            // file_listからこの変数が定義されたファイル名を取得できる
+        }
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_formal_parameter");
-        //
-        return &info;
+        // DW_AT_specification を持つ場合は他の DW_TAG_formal_parameter の付加情報
+        if (info.specification) {
+            auto it = dw_info.var_tbl.container.find(*info.specification);
+            if (it != dw_info.var_tbl.container.end()) {
+                auto &base_var = (it->second);
+
+                if (info.location && !base_var.location) {
+                    base_var.location = *info.location;
+                }
+            }
+        }
+
+        return die_info.offset;
     }
 
     // DW_TAG_reference_type

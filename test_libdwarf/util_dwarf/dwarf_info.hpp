@@ -123,6 +123,12 @@ struct dwarf_info
         using child_list_t = std::list<child_node_t>;
         child_list_t child_list;
 
+        // subroutine_typeの場合にparameter変数情報が付与される
+        // parameter変数も変数テーブルに登録して、Offsetをparameter情報として記憶しておく
+        using param_node_t = Dwarf_Off;
+        using param_list_t = std::list<param_node_t>;
+        param_list_t param_list;
+
         // 付加情報
         bool has_bitfield;
 
@@ -146,6 +152,8 @@ struct dwarf_info
               encoding(0),
               endianity(0),
               prototyped(false),
+              child_list(),
+              param_list(),
               has_bitfield(false) {
         }
     };

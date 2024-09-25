@@ -456,17 +456,23 @@ private:
             // 関数ポインタ表示
             std::format_to(inserter, "(*)(");
             // 引数型
-            auto it = dw_info.child_list.begin();
-            if (it != dw_info.child_list.end()) {
-                auto &param    = *it;
-                auto dbg_param = get_type_info(param->offset);
-                std::format_to(inserter, "{}", *dbg_param->name);
+            auto it = dw_info.param_list.begin();
+            if (it != dw_info.param_list.end()) {
+                auto param_offset = *it;
+                auto var_info_it  = dw_info_.var_tbl.container.find(param_offset);
+                if (var_info_it != dw_info_.var_tbl.container.end()) {
+                    auto dbg_param = get_type_info(*var_info_it->second.type);
+                    std::format_to(inserter, "{}", *dbg_param->name);
+                }
                 it++;
-            }
-            for (; it != dw_info.child_list.end(); it++) {
-                auto &param    = *it;
-                auto dbg_param = get_type_info(param->offset);
-                std::format_to(inserter, ", {}", *dbg_param->name);
+                for (; it != dw_info.param_list.end(); it++) {
+                    param_offset = *it;
+                    var_info_it  = dw_info_.var_tbl.container.find(param_offset);
+                    if (var_info_it != dw_info_.var_tbl.container.end()) {
+                        auto dbg_param = get_type_info(*var_info_it->second.type);
+                        std::format_to(inserter, ", {}", *dbg_param->name);
+                    }
+                }
             }
             std::format_to(inserter, ")");
         }
