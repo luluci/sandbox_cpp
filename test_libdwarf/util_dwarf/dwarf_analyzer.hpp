@@ -526,7 +526,7 @@ private:
 
     void analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // 変数情報作成
-        auto &&info = dw_info.global_var_tbl.make_new_info(die_info.offset);
+        auto &&info = dw_info.var_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_variable>(die, analyze_info_, info);
         // decl_fileチェック
         if (info.decl_file > 0) {
@@ -537,8 +537,8 @@ private:
         debug_dump_no_impl_child(die, "DW_TAG_variable");
         // DW_AT_specification を持つ場合は他の DW_TAG_variable の付加情報
         if (info.specification) {
-            auto it = dw_info.global_var_tbl.container.find(*info.specification);
-            if (it != dw_info.global_var_tbl.container.end()) {
+            auto it = dw_info.var_tbl.container.find(*info.specification);
+            if (it != dw_info.var_tbl.container.end()) {
                 auto &base_var = (it->second);
 
                 if (info.location && !base_var.location) {

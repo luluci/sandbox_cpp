@@ -230,7 +230,7 @@ struct dwarf_info
     arch::arch_info *arch_info;
 
     // DIE解析情報
-    var_info_container global_var_tbl;
+    var_info_container var_tbl;
     type_info_container type_tbl;
 
     // 必要ならバッファするように変更

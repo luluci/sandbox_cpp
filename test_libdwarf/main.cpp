@@ -186,7 +186,6 @@ int main(int argc, char *argv[]) {
     }
 
     util_dwarf::dwarf_analyzer di;
-    di.set_analyze_func_info(false);
     auto result = di.open(argv[1]);
     if (result) {
         util_dwarf::dwarf_info dw_info;

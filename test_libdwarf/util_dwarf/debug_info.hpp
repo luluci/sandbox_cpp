@@ -169,7 +169,7 @@ public:
     // using var_info = dwarf_info::var_info;
     using var_map_node_t = std::unique_ptr<var_info>;
     using var_map_t      = std::map<Dwarf_Off, var_map_node_t>;
-    var_map_t global_var_tbl;
+    var_map_t var_tbl;
     // 型情報
     using type_map_t = std::map<Dwarf_Unsigned, type_info>;
     type_map_t type_map;
@@ -195,7 +195,7 @@ public:
     }
     void build_var_info() {
         // ソート用に変数リストへのポインタをリストアップする
-        auto &dw_var_tbl = dw_info_.global_var_tbl.container;
+        auto &dw_var_tbl = dw_info_.var_tbl.container;
         for (auto &[offset, elem] : dw_var_tbl) {
             // location(address)を持っている変数を対象とする
             if (elem.location) {
@@ -203,12 +203,12 @@ public:
 
                 // DWARF上で同じ変数が複数のCU上に出現することがある
                 // 重複になるので除外する
-                if (!global_var_tbl.contains(addr)) {
+                if (!var_tbl.contains(addr)) {
                     // dwarf_infoからデータコピー
                     auto info = std::make_unique<var_info>();
                     info->copy(elem);
                     // map追加
-                    global_var_tbl.insert(std::make_pair(addr, std::move(info)));
+                    var_tbl.insert(std::make_pair(addr, std::move(info)));
                 }
             }
         }
@@ -226,7 +226,7 @@ public:
     }
 
     void memmap(std::function<void(var_info &, type_info &)> &&func) {
-        for (auto &[addr, var] : global_var_tbl) {
+        for (auto &[addr, var] : var_tbl) {
             if (var->type) {
                 auto it = type_map.find(*(var->type));
                 if (it != type_map.end()) {
@@ -719,7 +719,7 @@ public:
         bool result;
 
         // global_varをすべてチェック
-        for (auto &[addr, var] : global_var_tbl) {
+        for (auto &[addr, var] : var_tbl) {
             // 対応するtypeを取得
             if (var->type) {
                 auto it = type_map.find(*(var->type));
