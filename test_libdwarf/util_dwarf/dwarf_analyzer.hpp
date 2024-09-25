@@ -54,8 +54,6 @@ private:
         exit(1);  // 一応書いておく
     }
 
-    // 解析制御情報
-    bool analyze_func_info_;
     // 解析ワーク情報
     Dwarf_Debug dw_dbg;
     Dwarf_Error dw_error;
@@ -68,10 +66,6 @@ public:
     }
     ~dwarf_analyzer() {
         close();
-    }
-
-    void set_analyze_func_info(bool value) {
-        analyze_func_info_ = value;
     }
 
     bool open(char const *dwarf_file_path_cstr) {
@@ -395,7 +389,7 @@ private:
 
             // 関数タグ
             case DW_TAG_subprogram:
-                if (analyze_func_info_) {
+                if (analyze_info_.option.is_func_info_analyze) {
                     // no implement
                     break;
                 } else {
@@ -408,7 +402,7 @@ private:
                 // おそらくここには出現しない
                 break;
             case DW_TAG_label:
-                if (analyze_func_info_) {
+                if (analyze_info_.option.is_func_info_analyze) {
                     // no implement
                     break;
                 } else {
@@ -705,7 +699,7 @@ private:
             // 関数タグ
             case DW_TAG_subprogram:
                 // メンバ関数
-                if (analyze_func_info_) {
+                if (analyze_info_.option.is_func_info_analyze) {
                     // no implement
                     break;
                 } else {
