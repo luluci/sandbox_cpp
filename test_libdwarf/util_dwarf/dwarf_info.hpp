@@ -46,6 +46,9 @@ struct dwarf_info
         Dwarf_Unsigned endianity;                // DW_END_*
         std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
 
+        // 付加情報
+        bool is_parameter;
+
         var_info()
             : name(),
               linkage_name(),
@@ -59,7 +62,8 @@ struct dwarf_info
               const_value(0),
               sibling(0),
               endianity(0),
-              specification() {
+              specification(),
+              is_parameter(false) {
         }
     };
 

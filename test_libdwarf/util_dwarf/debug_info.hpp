@@ -213,16 +213,20 @@ public:
             // location(address)を即値で持っている変数を対象とする
             // exprで持っている場合はローカル変数等の配置が動的に変わる変数
             if (elem.location && elem.location->is_immediate) {
-                auto addr = std::get<Dwarf_Off>(elem.location->value);
+                // 変数除外判定
+                // parameterは除外する
+                if (!elem.is_parameter) {
+                    auto addr = std::get<Dwarf_Off>(elem.location->value);
 
-                // DWARF上で同じ変数が複数のCU上に出現することがある
-                // 重複になるので除外する
-                if (!var_tbl.contains(addr)) {
-                    // dwarf_infoからデータコピー
-                    auto info = std::make_unique<var_info>();
-                    info->copy(elem);
-                    // map追加
-                    var_tbl.insert(std::make_pair(addr, std::move(info)));
+                    // DWARF上で同じ変数が複数のCU上に出現することがある
+                    // 重複になるので除外する
+                    if (!var_tbl.contains(addr)) {
+                        // dwarf_infoからデータコピー
+                        auto info = std::make_unique<var_info>();
+                        info->copy(elem);
+                        // map追加
+                        var_tbl.insert(std::make_pair(addr, std::move(info)));
+                    }
                 }
             }
         }

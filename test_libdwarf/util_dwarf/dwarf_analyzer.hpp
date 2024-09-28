@@ -911,6 +911,9 @@ private:
         if (info.decl_file > 0) {
             // file_listからこの変数が定義されたファイル名を取得できる
         }
+        // parameterマーク
+        info.is_parameter = true;
+
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_formal_parameter");
