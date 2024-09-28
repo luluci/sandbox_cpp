@@ -41,6 +41,9 @@ public:
     using type_info  = dwarf_info::type_info;
     using type_child = dwarf_info::type_info::child_node_t;
 
+    // 関数情報
+    using func_info = dwarf_info::func_info;
+
 private:
     std::string dwarf_file_path;
     static constexpr size_t dw_true_path_buff_len = 512;
@@ -390,14 +393,11 @@ private:
             // 関数タグ
             case DW_TAG_subprogram:
                 if (analyze_info_.option.is_func_info_analyze) {
-                    // no implement
-                    break;
+                    analyze_DW_TAG_subprogram(die, info, die_info);
+                    return;
                 } else {
                     return;
                 }
-            case DW_TAG_subroutine_type:
-                analyze_DW_TAG_subroutine_type(die, info, die_info);
-                return;
             case DW_TAG_formal_parameter:
                 // おそらくここには出現しない
                 break;
@@ -441,6 +441,10 @@ private:
                 return;
             case DW_TAG_array_type:
                 analyze_DW_TAG_array_type(die, info, die_info);
+                return;
+
+            case DW_TAG_subroutine_type:
+                analyze_DW_TAG_subroutine_type(die, info, die_info);
                 return;
 
             // type-qualifier
@@ -548,6 +552,46 @@ private:
         }
 
         return die_info.offset;
+    }
+
+    void analyze_DW_TAG_subprogram(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
+        // 関数情報作成
+        auto &&info = dw_info.func_tbl.make_new_info(die_info.offset);
+        analyze_DW_AT<DW_TAG_subprogram>(die, analyze_info_, info);
+        // decl_fileチェック
+        if (0 < info.decl_file && info.decl_file < analyze_info_.file_list.size()) {
+            // file_listからこの変数が定義されたファイル名を取得できる
+            info.decl_file_name = analyze_info_.file_list[info.decl_file];
+        }
+        // child dieチェック
+        bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
+            analyze_DW_TAG_subprogram_child(child, dw_info, die_info, info);
+            return true;
+        });
+        // 異常が発生していたらfalseが返される
+        if (!result) {
+            utility::error_happen(&dw_error);
+        }
+    }
+    void analyze_DW_TAG_subprogram_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, func_info &parent_type) {
+        // DW_TAG_subroutine_typeのchildとして出現するDW_TAG_*を処理する
+        auto die_info = make_die_info(die);
+        switch (die_info.tag) {
+            case DW_TAG_formal_parameter: {
+                // parameterを作成
+                auto param = analyze_DW_TAG_formal_parameter(die, dw_info, die_info);
+                // parentのchildにparameterとして登録
+                parent_type.param_list.push_back(param);
+                return;
+            }
+
+            default:
+                break;
+        }
+
+        const char *name = 0;
+        dwarf_get_TAG_name(die_info.tag, &name);
+        fprintf(stderr, "no impl : DW_TAG_subprogram child : %s (%u)\n", name, die_info.tag);
     }
 
     void analyze_DW_TAG_base_type(Dwarf_Die die, dwarf_info &dw_info, die_info_t &) {

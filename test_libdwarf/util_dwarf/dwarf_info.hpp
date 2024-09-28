@@ -98,9 +98,9 @@ struct dwarf_info
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
-        Dwarf_Unsigned sibling;
-        bool declaration;               // 不完全型のときtrue
-        std::optional<Dwarf_Off> type;  // reference
+        bool declaration;                  // 不完全型のときtrue
+        std::optional<Dwarf_Off> type;     // reference
+        std::optional<Dwarf_Off> sibling;  //
 
         Dwarf_Unsigned byte_size;
         Dwarf_Unsigned bit_offset;
@@ -138,9 +138,9 @@ struct dwarf_info
               decl_file(0),
               decl_line(0),
               decl_column(0),
-              sibling(0),
               declaration(false),
               type(),
+              sibling(),
               byte_size(0),
               bit_offset(0),
               bit_size(0),
@@ -155,6 +155,52 @@ struct dwarf_info
               child_list(),
               param_list(),
               has_bitfield(false) {
+        }
+    };
+
+    // 関数情報
+    struct func_info
+    {
+        std::string name;
+        std::string linkage_name;
+        bool external;
+        Dwarf_Unsigned decl_file;  // filelistのインデックス
+        Dwarf_Unsigned decl_line;
+        Dwarf_Unsigned decl_column;
+        std::optional<Dwarf_Off> type;  // reference
+        std::optional<Dwarf_Off> location;
+        bool declaration;  // 不完全型のときtrue
+        Dwarf_Unsigned const_value;
+        Dwarf_Unsigned sibling;
+        Dwarf_Unsigned endianity;                // DW_END_*
+        std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
+
+        // parameter/local変数も変数テーブルに登録して、Offsetをparameter情報として記憶しておく
+        using var_node_t = Dwarf_Off;
+        using var_list_t = std::list<var_node_t>;
+        var_list_t param_list;
+        var_list_t local_var_list;
+
+        // 付加情報
+        std::string decl_file_name;
+
+        func_info()
+            : name(),
+              linkage_name(),
+              external(false),
+              decl_file(0),
+              decl_line(0),
+              decl_column(0),
+              type(),
+              location(),
+              declaration(false),
+              const_value(0),
+              sibling(0),
+              endianity(0),
+              specification(),
+              param_list(),
+              local_var_list(),
+              decl_file_name() {
         }
     };
 
@@ -180,6 +226,8 @@ struct dwarf_info
     using var_info_container = info_container<var_info>;
     // 型情報リスト
     using type_info_container = info_container<type_info>;
+    // 関数情報リスト
+    using func_info_container = info_container<func_info>;
 
     // compile_unitから取得する情報
     struct cu_info
@@ -240,6 +288,7 @@ struct dwarf_info
     // DIE解析情報
     var_info_container var_tbl;
     type_info_container type_tbl;
+    func_info_container func_tbl;
 
     // 必要ならバッファするように変更
     // cu_info_container cu_tbl;

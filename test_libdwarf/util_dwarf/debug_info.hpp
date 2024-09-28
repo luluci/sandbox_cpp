@@ -58,6 +58,15 @@ public:
     };
 
 public:
+    // 型情報構築状態
+    enum class build_type_state
+    {
+        None,        // 初期化状態
+        Building,    // 構築処理中
+        Incomplete,  // 不完全(型)
+        Complete,    // 構築完了
+    };
+
     using type_tag = dwarf_info::type_tag;
 
     struct var_info
@@ -141,6 +150,9 @@ public:
         // 付加情報
         bool has_bitfield;
 
+        // 解析フラグ
+        build_type_state build_state;
+
         type_info()
             : tag(0),
               name(nullptr),
@@ -161,7 +173,8 @@ public:
               param_list(nullptr),
               array_range_list(nullptr),
               sub_info(nullptr),
-              has_bitfield(false) {
+              has_bitfield(false),
+              build_state(build_type_state::None) {
         }
     };
 
@@ -239,29 +252,53 @@ public:
 private:
     type_info *get_type_info(Dwarf_Unsigned offset) {
         // 指定したoffsetのtype_infoを取得する
-        // 作成済みなら終了
+        // 作成済みデータがあれば終了
         auto it = type_map.find(offset);
         if (it != type_map.end()) {
-            return &(it->second);
+            switch (it->second.build_state) {
+                case build_type_state::Building:
+                case build_type_state::Complete:
+                    // Building: Dwarf定義内で循環参照している。arm_gccコンパイラで遭遇した。
+                    // Complete: 情報構築済みなのでそのまま使用可能
+                    return &(it->second);
+
+                case build_type_state::None:
+                case build_type_state::Incomplete:
+                default:
+                    // None: 未作成なのでありえない
+                    // Incomplete: Dwarf定義内循環参照等により途中で情報構築を打ち切っている。再構築する
+                    break;
+            }
         }
-        // 未作成なら作成
-        // ノード作成
-        auto [it2, result] = type_map.try_emplace(offset, type_info());
-        if (!result) {
-            // 重複はありえない
+        bool result;
+        // itを上書きしているので注意
+        if (it == type_map.end()) {
+            // 未作成なら作成
+            std::tie(it, result) = type_map.try_emplace(offset, type_info());
+            if (!result) {
+                // 重複はありえない
+            }
+        } else if (it->second.build_state == build_type_state::Incomplete) {
+            // 未完成なら再構築
+            using obj_type = decltype(it->second);
+            it->second     = obj_type();
         }
         // 情報作成
-        build_type_info(it2->second, offset);
-        return &(it2->second);
+        build_type_info(it->second, offset);
+        return &(it->second);
     }
 
     void build_type_info(type_info &dbg_info, Dwarf_Unsigned offset) {
+        // 情報構築開始
+        dbg_info.build_state = build_type_state::Building;
+        //
         auto &dw_type_map = dw_info_.type_tbl.container;
         // 開始ノード存在チェック
         auto it = dw_type_map.find(offset);
         if (it == dw_type_map.end()) {
             // 存在しなければ空のまま終了
-            return;
+            // return;
+            throw std::runtime_error("logic error");
         }
         // 開始ノードが存在したらデータ作成開始
         // child typeの存在をチェック
@@ -278,76 +315,71 @@ private:
             }
         }
         // type_infoに今回対象となるoffsetの情報を適用する
-        adapt_info(dbg_info, root_dw_info);
+        // データ構築完了したか、循環参照で中断したかを返す
+        auto result = adapt_info(dbg_info, root_dw_info);
         adapt_info_fix(dbg_info);
+        //
+        if (result) {
+            dbg_info.build_state = build_type_state::Complete;
+        } else {
+            dbg_info.build_state = build_type_state::Incomplete;
+        }
     }
 
-    void adapt_info(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         adapt_value(dbg_info.type, dw_info.type);
 
         switch (dw_info.tag) {
             case type_tag::base:
-                adapt_info_base(dbg_info, dw_info);
-                break;
+                return adapt_info_base(dbg_info, dw_info);
 
             case type_tag::func:
-                adapt_info_func(dbg_info, dw_info);
-                break;
+                return adapt_info_func(dbg_info, dw_info);
 
             case type_tag::typedef_:
-                adapt_info_typedef(dbg_info, dw_info);
-                break;
+                return adapt_info_typedef(dbg_info, dw_info);
 
             case type_tag::struct_:
             case type_tag::union_:
-                adapt_info_struct_union(dbg_info, dw_info);
-                break;
+                return adapt_info_struct_union(dbg_info, dw_info);
 
             case type_tag::array:
-                adapt_info_array(dbg_info, dw_info);
-                break;
+                return adapt_info_array(dbg_info, dw_info);
 
             case type_tag::pointer:
-                adapt_info_pointer(dbg_info, dw_info);
-                break;
+                return adapt_info_pointer(dbg_info, dw_info);
 
             case type_tag::const_:
-                adapt_info_const(dbg_info, dw_info);
-                break;
+                return adapt_info_const(dbg_info, dw_info);
 
             case type_tag::restrict_:
-                adapt_info_restrict(dbg_info, dw_info);
-                break;
+                return adapt_info_restrict(dbg_info, dw_info);
 
             case type_tag::volatile_:
-                adapt_info_volatile(dbg_info, dw_info);
-                break;
+                return adapt_info_volatile(dbg_info, dw_info);
 
             case type_tag::enum_:
-                adapt_info_enum(dbg_info, dw_info);
-                break;
+                return adapt_info_enum(dbg_info, dw_info);
 
             case type_tag::member:
-                adapt_info_member(dbg_info, dw_info);
-                break;
+                return adapt_info_member(dbg_info, dw_info);
 
             case type_tag::reference:
-                adapt_info_reference(dbg_info, dw_info);
-                break;
+                return adapt_info_reference(dbg_info, dw_info);
 
             case type_tag::parameter:
-                adapt_info_parameter(dbg_info, dw_info);
-                break;
+                return adapt_info_parameter(dbg_info, dw_info);
 
             case type_tag::subrange:
-                adapt_info_subrange(dbg_info, dw_info);
-                break;
+                return adapt_info_subrange(dbg_info, dw_info);
 
             default:
                 // 実装忘れ
                 fprintf(stderr, "no impl : build_node : 0x%02X\n", dw_info.tag);
                 break;
         }
+
+        return false;
     }
 
     void adapt_info_fix(type_info &dbg_info) {
@@ -388,16 +420,18 @@ private:
         }
     }
 
-    void adapt_info_base(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_base(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.encoding, dw_info.encoding);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
-    void adapt_info_enum(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_enum(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // dwarfデータのnameが空の場合は無名定義
         if (dw_info.name.size() == 0) {
             dw_info.name = "<unnamed>";
@@ -407,9 +441,12 @@ private:
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
-    void adapt_info_member(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_member(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        bool is_comple = true;
         // dwarfデータのnameが空の場合は無名定義
         if (dw_info.name.size() == 0) {
             dw_info.name = "<unnamed>";
@@ -421,26 +458,36 @@ private:
         adapt_value(dbg_info.bit_size, dw_info.bit_size);
         adapt_value(dbg_info.data_bit_offset, dw_info.data_bit_offset);
         adapt_value(dbg_info.data_member_location, dw_info.data_member_location);
-        //
+        // 型情報があれば取得
+        // 不完全型かどうかを戻り値で返す
         if (dw_info.type) {
             dbg_info.sub_info = get_type_info(*dw_info.type);
+            is_comple         = dbg_info.sub_info->build_state == build_type_state::Complete;
         }
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return is_comple;
     }
 
-    void adapt_info_reference(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_reference(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        bool is_comple = true;
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
-        //
+        // 型情報があれば取得
+        // 不完全型かどうかを戻り値で返す
         if (dw_info.type) {
             dbg_info.sub_info = get_type_info(*dw_info.type);
+            is_comple         = dbg_info.sub_info->build_state == build_type_state::Complete;
         }
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return is_comple;
     }
 
-    void adapt_info_func(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_func(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        bool is_comple = true;
         // 関数ポインタ型名前作成
         if (dw_info.name.size() > 0) {
             // 関数ポインタ型名称を優先
@@ -462,15 +509,41 @@ private:
                 auto var_info_it  = dw_info_.var_tbl.container.find(param_offset);
                 if (var_info_it != dw_info_.var_tbl.container.end()) {
                     auto dbg_param = get_type_info(*var_info_it->second.type);
-                    std::format_to(inserter, "{}", *dbg_param->name);
+                    switch (dbg_param->build_state) {
+                        case build_type_state::Complete:
+                            // 構築済みデータが取得出来ればOK
+                            std::format_to(inserter, "{}", *dbg_param->name);
+                            break;
+
+                        case build_type_state::None:
+                        case build_type_state::Building:
+                        case build_type_state::Incomplete:
+                        default:
+                            // それ以外は終了
+                            is_comple = false;
+                            break;
+                    }
                 }
                 it++;
-                for (; it != dw_info.param_list.end(); it++) {
+                for (; is_comple && it != dw_info.param_list.end(); it++) {
                     param_offset = *it;
                     var_info_it  = dw_info_.var_tbl.container.find(param_offset);
                     if (var_info_it != dw_info_.var_tbl.container.end()) {
                         auto dbg_param = get_type_info(*var_info_it->second.type);
-                        std::format_to(inserter, ", {}", *dbg_param->name);
+                        switch (dbg_param->build_state) {
+                            case build_type_state::Complete:
+                                // 構築済みデータが取得出来ればOK
+                                std::format_to(inserter, ", {}", *dbg_param->name);
+                                break;
+
+                            case build_type_state::None:
+                            case build_type_state::Building:
+                            case build_type_state::Incomplete:
+                            default:
+                                // それ以外は終了
+                                is_comple = false;
+                                break;
+                        }
                     }
                 }
             }
@@ -482,20 +555,29 @@ private:
         adapt_value(dbg_info.param_list, dw_info.child_list);
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        if (!is_comple) {
+            dw_info.name = "<funcptr>";
+        }
+        return is_comple;
     }
 
-    void adapt_info_parameter(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_parameter(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        bool is_comple = true;
         //
         adapt_value(dbg_info.name, dw_info.name);
         //
         if (dw_info.type) {
             dbg_info.sub_info = get_type_info(*dw_info.type);
+            is_comple         = dbg_info.sub_info->build_state == build_type_state::Complete;
         }
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return is_comple;
     }
 
-    void adapt_info_typedef(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_typedef(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
         if (opt_.is_through_typedef) {
             adapt_value(dbg_info.name, dw_info.name);
@@ -504,9 +586,11 @@ private:
         }
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
-    void adapt_info_struct_union(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_struct_union(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // dwarfデータのnameが空の場合は無名定義
         if (dw_info.name.size() == 0) {
             dw_info.name = "<unnamed>";
@@ -518,9 +602,11 @@ private:
         adapt_value(dbg_info.has_bitfield, dw_info.has_bitfield);
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
-    void adapt_info_array(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_array(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         // arrayはsub_infoに型情報を保持している
@@ -541,21 +627,27 @@ private:
         }
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
-    void adapt_info_subrange(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_subrange(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        bool is_comple = true;
         //
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.count, dw_info.count);
         //
         if (dw_info.type) {
             dbg_info.sub_info = get_type_info(*dw_info.type);
+            is_comple         = dbg_info.sub_info->build_state == build_type_state::Complete;
         }
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return is_comple;
     }
 
-    void adapt_info_pointer(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_pointer(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // ポインタサイズが優先のため上書き
         if (dw_info.address_class) {
             // address_classを持っているとき
@@ -595,25 +687,33 @@ private:
 
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
-    void adapt_info_const(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_const(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         //
         dbg_info.is_const = true;
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
-    void adapt_info_restrict(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_restrict(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         //
         dbg_info.is_restrict = true;
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
-    void adapt_info_volatile(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+    bool adapt_info_volatile(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         //
         dbg_info.is_volatile = true;
         //
         dbg_info.tag |= dw_info.tag;
+        //
+        return true;
     }
 
     void adapt_value(std::string *&dst, std::string &src) {
