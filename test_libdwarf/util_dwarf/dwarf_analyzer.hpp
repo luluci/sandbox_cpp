@@ -556,7 +556,7 @@ private:
         return die_info.offset;
     }
 
-    void analyze_DW_TAG_subprogram(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
+    Dwarf_Off analyze_DW_TAG_subprogram(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {
         // 関数情報作成
         auto &&info = dw_info.func_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_subprogram>(die, analyze_info_, info);
@@ -574,6 +574,8 @@ private:
         if (!result) {
             utility::error_happen(&dw_error);
         }
+        //
+        return die_info.offset;
     }
     void analyze_DW_TAG_subprogram_child(Dwarf_Die die, dwarf_info &dw_info, die_info_t &, func_info &parent_type) {
         // DW_TAG_subroutine_typeのchildとして出現するDW_TAG_*を処理する
@@ -584,6 +586,20 @@ private:
                 auto param = analyze_DW_TAG_formal_parameter(die, dw_info, die_info);
                 // parentのchildにparameterとして登録
                 parent_type.param_list.push_back(param);
+                return;
+            }
+
+            case DW_TAG_variable: {
+                auto local_var = analyze_DW_TAG_variable(die, dw_info, die_info);
+                parent_type.local_var_list.push_back(local_var);
+                //
+                auto &local_var_item        = dw_info.var_tbl.container[local_var];
+                local_var_item.is_local_var = true;
+                return;
+            }
+
+            case DW_TAG_typedef: {
+                analyze_DW_TAG_typedef(die, dw_info, die_info);
                 return;
             }
 
@@ -748,8 +764,9 @@ private:
             case DW_TAG_subprogram:
                 // メンバ関数
                 if (analyze_info_.option.is_func_info_analyze) {
-                    // no implement
-                    break;
+                    auto offset = analyze_DW_TAG_subprogram(die, dw_info, die_info);
+                    parent_type.member_func_list.push_back(offset);
+                    return;
                 } else {
                     return;
                 }

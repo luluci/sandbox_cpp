@@ -48,6 +48,7 @@ struct dwarf_info
 
         // 付加情報
         bool is_parameter;
+        bool is_local_var;
 
         var_info()
             : name(),
@@ -63,7 +64,8 @@ struct dwarf_info
               sibling(0),
               endianity(0),
               specification(),
-              is_parameter(false) {
+              is_parameter(false),
+              is_local_var(false) {
         }
     };
 
@@ -121,6 +123,7 @@ struct dwarf_info
         Dwarf_Unsigned encoding;   // DW_ATE_*
         Dwarf_Unsigned endianity;  // DW_END_*
         bool prototyped;
+        bool artificial;
 
         // memberも単体でtype_mapに登録するのでchild_listは参照用のポインタでいい
         using child_node_t = type_info *;
@@ -132,6 +135,12 @@ struct dwarf_info
         using param_node_t = Dwarf_Off;
         using param_list_t = std::list<param_node_t>;
         param_list_t param_list;
+
+        // メンバ関数参照テーブル
+        // func_tblに登録した関数へのオフセット参照
+        using func_node_t = Dwarf_Off;
+        using func_list_t = std::list<func_node_t>;
+        func_list_t member_func_list;
 
         // 付加情報
         bool has_bitfield;
@@ -156,6 +165,7 @@ struct dwarf_info
               encoding(0),
               endianity(0),
               prototyped(false),
+              artificial(false),
               child_list(),
               param_list(),
               has_bitfield(false) {
@@ -179,6 +189,7 @@ struct dwarf_info
         Dwarf_Unsigned endianity;                // DW_END_*
         std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
         std::optional<dw_op_value> return_addr;
+        std::optional<dw_op_value> frame_base;
 
         // parameter/local変数も変数テーブルに登録して、Offsetをparameter情報として記憶しておく
         using var_node_t = Dwarf_Off;
@@ -204,6 +215,7 @@ struct dwarf_info
               endianity(0),
               specification(),
               return_addr(),
+              frame_base(),
               param_list(),
               local_var_list(),
               decl_file_name() {

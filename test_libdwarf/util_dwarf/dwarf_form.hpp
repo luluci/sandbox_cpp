@@ -49,7 +49,7 @@ dw_form_result_t get_DW_FORM_block(dwarf_analyze_info &info) {
                 auto eval = info.dw_expr.pop<T>();
                 if (!eval) {
                     // ありえない
-                    fprintf(stderr, "error: get_DW_FORM_block : DWARF expr logic error.");
+                    fprintf(stderr, "error: get_DW_FORM_block : DWARF expr logic error.\n");
                 }
                 form_result = *eval;
             } else {
@@ -93,7 +93,7 @@ dw_form_result_t get_DW_FORM_block_N(dwarf_analyze_info &info) {
                 auto eval = info.dw_expr.pop<T>();
                 if (!eval) {
                     // ありえない
-                    fprintf(stderr, "error: get_DW_FORM_block_N : DWARF expr logic error.");
+                    fprintf(stderr, "error: get_DW_FORM_block_N : DWARF expr logic error.\n");
                 }
                 form_result = *eval;
             } else {

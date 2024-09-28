@@ -28,7 +28,7 @@ public:
     }
     dw_op_value(Dwarf_Signed val) : value(val), is_immediate(true) {
     }
-    dw_op_value(uint8_t const *buff, size_t buff_size) : expr(&buff[0], &buff[buff_size]) {
+    dw_op_value(uint8_t const *buff, size_t buff_size) : expr(&buff[0], &buff[buff_size]), is_immediate(false) {
     }
 };
 

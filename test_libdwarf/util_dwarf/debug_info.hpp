@@ -215,7 +215,7 @@ public:
             if (elem.location && elem.location->is_immediate) {
                 // 変数除外判定
                 // parameterは除外する
-                if (!elem.is_parameter) {
+                if (!elem.is_parameter && !elem.is_local_var) {
                     auto addr = std::get<Dwarf_Off>(elem.location->value);
 
                     // DWARF上で同じ変数が複数のCU上に出現することがある

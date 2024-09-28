@@ -230,6 +230,15 @@ void get_DW_AT_return_addr(dwarf_analyze_info &dw_info, T &info) {
     }
 }
 
+// DW_AT_frame_base
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_frame_base(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
+    if (result) {
+        info.frame_base = *result;
+    }
+}
+
 // DW_AT_producer
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_producer(dwarf_analyze_info &dw_info, T &info) {
@@ -252,6 +261,18 @@ void get_DW_AT_prototyped(dwarf_analyze_info &dw_info, T &info) {
         utility::error_happen(&dw_info.dw_error);
     }
     info.prototyped = (returned_bool == 1);
+}
+
+// DW_AT_artificial
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_artificial(dwarf_analyze_info &dw_info, T &info) {
+    Dwarf_Bool returned_bool = 0;
+    int result;
+    result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
+    if (result != DW_DLV_OK) {
+        utility::error_happen(&dw_info.dw_error);
+    }
+    info.artificial = (returned_bool == 1);
 }
 
 // DW_AT_count
@@ -562,6 +583,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_artificial:
+            if constexpr (std::is_same_v<T, dwarf_info::type_info>) {
+                get_DW_AT_artificial<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_base_types:
         case DW_AT_calling_convention:
             break;
@@ -616,6 +642,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_frame_base:
+            if constexpr (std::is_same_v<T, dwarf_info::func_info>) {
+                get_DW_AT_frame_base<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_friend:
         case DW_AT_identifier_case:
         case DW_AT_macro_info:
@@ -754,7 +785,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
     // no impl
     const char *attrname = nullptr;
     dwarf_get_AT_name(attrnum, &attrname);
-    fprintf(stderr, "no impl : %s (%u)\n", attrname, attrnum);
+    fprintf(stderr, "no impl : analyze_DW_AT_impl : %s (%u)\n", attrname, attrnum);
 }
 
 /// @brief 対象DIEに紐づくattributeを解析して情報を取得する
