@@ -5,9 +5,11 @@
 #include <libdwarf.h>
 
 #include <optional>
+#include <variant>
 
 #include "LEB128.hpp"
 #include "dwarf_analyze_info.hpp"
+#include "dwarf_expression.hpp"
 #include "utility.hpp"
 
 // API examples
@@ -15,10 +17,13 @@
 
 namespace util_dwarf {
 
+using dw_form_result_t = std::optional<dw_op_value>;
+
 //
-template <typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM_block(dwarf_analyze_info &info) {
+template <typename T>
+dw_form_result_t get_DW_FORM_block(dwarf_analyze_info &info) {
     // blockデータ取得
+    dw_form_result_t form_result;
     Dwarf_Block *tempb = 0;
     int result;
     result = dwarf_formblock(info.dw_attr, &tempb, &info.dw_error);
@@ -32,29 +37,37 @@ ReturnT get_DW_FORM_block(dwarf_analyze_info &info) {
     // ULEB128を取得
     ULEB128 uleb(buff_ptr, buff_len);
     // blockを取得
-    Dwarf_Unsigned value = 0;
     if (buff_len == (uleb.used_bytes + uleb.value)) {
         // ULEB128が示すデータ長がblockサイズと同じならそのまま取り出す
         // dataをlittle endianで結合
-        value = utility::concat_le<Dwarf_Unsigned>(buff_ptr, uleb.used_bytes, buff_len);
+        form_result = utility::concat_le<Dwarf_Unsigned>(buff_ptr, uleb.used_bytes, buff_len);
     } else {
         // 一致しないとき、DWARF expression として解釈
-        info.dw_expr.eval(buff_ptr, buff_len);
-        auto eval = info.dw_expr.pop<T>();
-        if (!eval) {
-            // ありえない
-            fprintf(stderr, "error: get_DW_FORM_block : DWARF expr logic error.");
+        auto expr_ret = info.dw_expr.eval(buff_ptr, buff_len);
+        if (expr_ret) {
+            if (expr_ret->is_immediate) {
+                auto eval = info.dw_expr.pop<T>();
+                if (!eval) {
+                    // ありえない
+                    fprintf(stderr, "error: get_DW_FORM_block : DWARF expr logic error.");
+                }
+                form_result = *eval;
+            } else {
+                form_result = std::move(*expr_ret);
+            }
+        } else {
+            // nullopt
         }
-        value = *eval;
     }
 
     // https://www.prevanders.net/libdwarfdoc/group__examplediscrlist.html
     dwarf_dealloc(info.dw_dbg, tempb, DW_DLA_BLOCK);
-    return ReturnT(value);
+    return form_result;
 }
 //
-template <size_t N, typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
+template <size_t N, typename T>
+dw_form_result_t get_DW_FORM_block_N(dwarf_analyze_info &info) {
+    dw_form_result_t form_result;
     Dwarf_Block *tempb = 0;
     int result;
     result = dwarf_formblock(info.dw_attr, &tempb, &info.dw_error);
@@ -65,32 +78,39 @@ ReturnT get_DW_FORM_block_N(dwarf_analyze_info &info) {
     // N = 1: [ length data1 data2 ... ] or [ DWARF expr ]
     // N = 2: [ length1 length2 data1 data2 ... ] or [ DWARF expr ]
     // N = 4: [ length1 length2 length3 length4 data1 data2 ... ] or [ DWARF expr ]
-    auto buff_ptr        = static_cast<uint8_t *>(tempb->bl_data);
-    auto buff_len        = tempb->bl_len;
-    Dwarf_Unsigned len   = N + utility::concat_le<Dwarf_Unsigned>(buff_ptr, 0, N);
-    Dwarf_Unsigned value = 0;
+    auto buff_ptr      = static_cast<uint8_t *>(tempb->bl_data);
+    auto buff_len      = tempb->bl_len;
+    Dwarf_Unsigned len = N + utility::concat_le<Dwarf_Unsigned>(buff_ptr, 0, N);
     if (buff_len == len) {
         // length byte と valueの要素数が一致するとき、block<N>として解釈
         // dataをlittle endianで結合
-        value = utility::concat_le<Dwarf_Unsigned>(buff_ptr, N, buff_len);
+        form_result = utility::concat_le<Dwarf_Unsigned>(buff_ptr, N, buff_len);
     } else {
         // 一致しないとき、DWARF expression として解釈
-        info.dw_expr.eval(buff_ptr, buff_len);
-        auto eval = info.dw_expr.pop<T>();
-        if (!eval) {
-            // ありえない
-            fprintf(stderr, "error: get_DW_FORM_block_N : DWARF expr logic error.");
+        auto expr_result = info.dw_expr.eval(buff_ptr, buff_len);
+        if (expr_result) {
+            if (expr_result->is_immediate) {
+                auto eval = info.dw_expr.pop<T>();
+                if (!eval) {
+                    // ありえない
+                    fprintf(stderr, "error: get_DW_FORM_block_N : DWARF expr logic error.");
+                }
+                form_result = *eval;
+            } else {
+                form_result = std::move(*expr_result);
+            }
+        } else {
+            // nullopt
         }
-        value = *eval;
     }
 
     // https://www.prevanders.net/libdwarfdoc/group__examplediscrlist.html
     dwarf_dealloc(info.dw_dbg, tempb, DW_DLA_BLOCK);
-    return ReturnT(value);
+    return form_result;
 }
 //
-template <typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM_udata(dwarf_analyze_info &info) {
+template <typename T>
+dw_form_result_t get_DW_FORM_udata(dwarf_analyze_info &info) {
     Dwarf_Unsigned data;
     int result;
     result = dwarf_formudata(info.dw_attr, &data, &info.dw_error);
@@ -98,7 +118,7 @@ ReturnT get_DW_FORM_udata(dwarf_analyze_info &info) {
         utility::error_happen(&info.dw_error);
         return std::nullopt;
     }
-    return ReturnT(data);
+    return dw_form_result_t(data);
 }
 //
 struct DW_FORM_ref_result_t
@@ -140,8 +160,9 @@ std::optional<DW_FORM_ref_result_t> get_DW_FORM_sec_offset(dwarf_analyze_info &i
     return std::optional<DW_FORM_ref_result_t>(ref_value);
 }
 // DW_FORM_exprloc
-template <typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM_exprloc(dwarf_analyze_info &info) {
+template <typename T>
+dw_form_result_t get_DW_FORM_exprloc(dwarf_analyze_info &info) {
+    dw_form_result_t form_result;
     Dwarf_Unsigned return_exprlen = 0;
     Dwarf_Ptr block_ptr           = nullptr;
     int result;
@@ -150,16 +171,26 @@ ReturnT get_DW_FORM_exprloc(dwarf_analyze_info &info) {
         utility::error_happen(&info.dw_error);
         return std::nullopt;
     }
-    info.dw_expr.eval(static_cast<uint8_t *>(block_ptr), return_exprlen);
-    auto eval = info.dw_expr.pop<T>();
-    if (eval) {
-        return ReturnT(*eval);
+    auto expr_result = info.dw_expr.eval(static_cast<uint8_t *>(block_ptr), return_exprlen);
+    if (expr_result) {
+        if (expr_result->is_immediate) {
+            auto eval = info.dw_expr.pop<T>();
+            if (!eval) {
+                // ありえない
+                fprintf(stderr, "error: get_DW_FORM_exprloc : DWARF expr logic error.");
+            }
+            form_result = *eval;
+        } else {
+            form_result = std::move(*expr_result);
+        }
+    } else {
+        // nullopt
     }
-    return std::nullopt;
+    return form_result;
 }
 
-template <typename T, typename ReturnT = std::optional<T>>
-ReturnT get_DW_FORM(dwarf_analyze_info &info) {
+template <typename T>
+dw_form_result_t get_DW_FORM(dwarf_analyze_info &info) {
     Dwarf_Half form;
     int result;
     // form形式を取得
@@ -175,7 +206,7 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
             if (ret) {
                 // DW_FORM_ref_addrは他のCUの.debug_info のheader offset
                 // つまりどういうこと？
-                return ReturnT(ret->return_offset);
+                return dw_form_result_t(ret->return_offset);
             }
         } break;
         case DW_FORM_ref1:
@@ -194,7 +225,7 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
                     // 暫定：debug_typesが出現することがあるか？
                     addr += info.cu_info.cu_offset;
                 }
-                return ReturnT(addr);
+                return dw_form_result_t(addr);
             }
         } break;
 
@@ -215,7 +246,7 @@ ReturnT get_DW_FORM(dwarf_analyze_info &info) {
                     // 暫定：debug_typesが出現することがあるか？
                     // addr += info.cu_info.cu_offset;
                 }
-                return ReturnT(addr);
+                return dw_form_result_t(addr);
             }
         } break;
 

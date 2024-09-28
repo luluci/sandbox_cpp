@@ -30,10 +30,10 @@ void get_DW_AT_location(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_data_member_location(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.data_member_location = *result;
+    if (result && result->is_immediate) {
+        info.data_member_location = std::get<Dwarf_Unsigned>(result->value);
     } else {
-        info.data_member_location = 0;
+        info.data_member_location = static_cast<Dwarf_Off>(0);
     }
 }
 
@@ -41,8 +41,8 @@ void get_DW_AT_data_member_location(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_low_pc(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.low_pc = *result;
+    if (result && result->is_immediate) {
+        info.low_pc = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.low_pc = 0;
     }
@@ -51,8 +51,8 @@ void get_DW_AT_low_pc(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_high_pc(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.high_pc = *result;
+    if (result && result->is_immediate) {
+        info.high_pc = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.high_pc = 0;
     }
@@ -62,8 +62,8 @@ void get_DW_AT_high_pc(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_language(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.language = *result;
+    if (result && result->is_immediate) {
+        info.language = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.language = 0;
     }
@@ -85,8 +85,8 @@ void get_DW_AT_comp_dir(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_const_value(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.const_value = *result;
+    if (result && result->is_immediate) {
+        info.const_value = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.const_value = 0;
     }
@@ -117,8 +117,8 @@ void get_DW_AT_name(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_byte_size(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.byte_size = *result;
+    if (result && result->is_immediate) {
+        info.byte_size = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.byte_size = 0;
     }
@@ -127,8 +127,8 @@ void get_DW_AT_byte_size(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_bit_offset(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.bit_offset = *result;
+    if (result && result->is_immediate) {
+        info.bit_offset = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.bit_offset = 0;
     }
@@ -137,8 +137,8 @@ void get_DW_AT_bit_offset(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_bit_size(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.bit_size = *result;
+    if (result && result->is_immediate) {
+        info.bit_size = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.bit_size = 0;
     }
@@ -147,8 +147,8 @@ void get_DW_AT_bit_size(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_data_bit_offset(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.data_bit_offset = *result;
+    if (result && result->is_immediate) {
+        info.data_bit_offset = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.data_bit_offset = 0;
     }
@@ -159,8 +159,8 @@ void get_DW_AT_data_bit_offset(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_stmt_list(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Off>(dw_info);
-    if (result) {
-        info.stmt_list = *result;
+    if (result && result->is_immediate) {
+        info.stmt_list = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.stmt_list = 0;
     }
@@ -182,8 +182,8 @@ void get_DW_AT_linkage_name(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_signature(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.signature = *result;
+    if (result && result->is_immediate) {
+        info.signature = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.signature = 0;
     }
@@ -196,8 +196,8 @@ void get_DW_AT_accessibility(dwarf_analyze_info &dw_info, T &info) {
     // DW_ACCESS_public
     // DW_ACCESS_private
     // DW_ACCESS_protected
-    if (result) {
-        info.accessibility = *result;
+    if (result && result->is_immediate) {
+        info.accessibility = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.accessibility = 0;
     }
@@ -207,8 +207,8 @@ void get_DW_AT_accessibility(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_upper_bound(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.upper_bound = *result;
+    if (result && result->is_immediate) {
+        info.upper_bound = std::get<Dwarf_Unsigned>(result->value);
     }
 }
 // DW_AT_lower_bound
@@ -216,8 +216,17 @@ void get_DW_AT_upper_bound(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_lower_bound(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
+    if (result && result->is_immediate) {
+        info.lower_bound = std::get<Dwarf_Unsigned>(result->value);
+    }
+}
+
+// DW_AT_return_addr
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_return_addr(dwarf_analyze_info &dw_info, T &info) {
+    auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
     if (result) {
-        info.lower_bound = *result;
+        info.return_addr = *result;
     }
 }
 
@@ -249,8 +258,8 @@ void get_DW_AT_prototyped(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_count(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.count = *result;
+    if (result && result->is_immediate) {
+        info.count = std::get<Dwarf_Unsigned>(result->value);
     }
 }
 
@@ -258,8 +267,8 @@ void get_DW_AT_count(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_address_class(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.address_class = *result;
+    if (result && result->is_immediate) {
+        info.address_class = std::get<Dwarf_Unsigned>(result->value);
     }
 }
 
@@ -267,8 +276,8 @@ void get_DW_AT_address_class(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_decl_column(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.decl_column = *result;
+    if (result && result->is_immediate) {
+        info.decl_column = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.decl_column = 0;
     }
@@ -279,10 +288,10 @@ void get_DW_AT_decl_column(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_decl_file(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
+    if (result && result->is_immediate) {
         // index==1がデフォルトでソースファイルになるはずだが、そうでないこともある
         // CU情報内ファイル名が対応するindexとdecl_fileが同じなら自CU内で定義されたとみなす
-        info.decl_file = *result;
+        info.decl_file = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.decl_file = 0;
     }
@@ -292,8 +301,8 @@ void get_DW_AT_decl_file(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_decl_line(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.decl_line = *result;
+    if (result && result->is_immediate) {
+        info.decl_line = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.decl_line = 0;
     }
@@ -303,8 +312,8 @@ void get_DW_AT_decl_line(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_encoding(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.encoding = *result;
+    if (result && result->is_immediate) {
+        info.encoding = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.encoding = 0;
     }
@@ -314,8 +323,8 @@ void get_DW_AT_encoding(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_sibling(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.sibling = *result;
+    if (result && result->is_immediate) {
+        info.sibling = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.sibling = 0;
     }
@@ -325,8 +334,8 @@ void get_DW_AT_sibling(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_specification(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.specification = *result;
+    if (result && result->is_immediate) {
+        info.specification = std::get<Dwarf_Unsigned>(result->value);
     }
 }
 
@@ -334,8 +343,8 @@ void get_DW_AT_specification(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_type(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.type = *result;
+    if (result && result->is_immediate) {
+        info.type = std::get<Dwarf_Unsigned>(result->value);
     }
 }
 
@@ -343,8 +352,8 @@ void get_DW_AT_type(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_endianity(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.type = *result;
+    if (result && result->is_immediate) {
+        info.type = std::get<Dwarf_Unsigned>(result->value);
     }
 }
 
@@ -352,8 +361,8 @@ void get_DW_AT_endianity(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_ranges(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.ranges = *result;
+    if (result && result->is_immediate) {
+        info.ranges = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.ranges = 0;
     }
@@ -363,8 +372,8 @@ void get_DW_AT_ranges(dwarf_analyze_info &dw_info, T &info) {
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_binary_scale(dwarf_analyze_info &dw_info, T &info) {
     auto result = get_DW_FORM<Dwarf_Unsigned>(dw_info);
-    if (result) {
-        info.binary_scale = *result;
+    if (result && result->is_immediate) {
+        info.binary_scale = std::get<Dwarf_Unsigned>(result->value);
     } else {
         info.binary_scale = 0;
     }
@@ -521,6 +530,11 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_return_addr:
+            if constexpr (std::is_same_v<T, dwarf_info::func_info>) {
+                get_DW_AT_return_addr<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_start_scope:
         case DW_AT_bit_stride:
             // case DW_AT_stride_size:

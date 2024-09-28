@@ -200,6 +200,8 @@ private:
         }
         // アーキテクチャ情報選択
         info.arch_info = &(arch::arch_info_tbl[info.machine_arch.obj_machine]);
+        //
+        analyze_info_.dw_expr.pointer_size(info.machine_arch.obj_pointersize);
     }
 
     void analyze_cu(Dwarf_Die dw_cu_die, dwarf_info &info) {

@@ -80,7 +80,7 @@ public:
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
         Dwarf_Unsigned endianity;  // DW_END_*
-        std::optional<Dwarf_Off> location;
+        std::optional<dw_op_value *> location;
         std::optional<Dwarf_Off> type;  // reference
 
         var_info()
@@ -111,7 +111,7 @@ public:
             if (info.type)
                 type = *info.type;
             if (info.location)
-                location = *info.location;
+                location = &(*info.location);
         }
     };
 
@@ -210,9 +210,10 @@ public:
         // ソート用に変数リストへのポインタをリストアップする
         auto &dw_var_tbl = dw_info_.var_tbl.container;
         for (auto &[offset, elem] : dw_var_tbl) {
-            // location(address)を持っている変数を対象とする
-            if (elem.location) {
-                auto addr = *elem.location;
+            // location(address)を即値で持っている変数を対象とする
+            // exprで持っている場合はローカル変数等の配置が動的に変わる変数
+            if (elem.location && elem.location->is_immediate) {
+                auto addr = std::get<Dwarf_Off>(elem.location->value);
 
                 // DWARF上で同じ変数が複数のCU上に出現することがある
                 // 重複になるので除外する
@@ -873,8 +874,8 @@ private:
         // 表示名作成
         std::format_to(std::back_inserter(var_name), "{}", *var.name);
         // アドレス計算
-        if (var.location) {
-            address = *var.location;
+        if (var.location && (*var.location)->is_immediate) {
+            address = std::get<Dwarf_Off>((*var.location)->value);
         } else {
             address = 0;
         }

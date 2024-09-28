@@ -39,7 +39,7 @@ struct dwarf_info
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         std::optional<Dwarf_Off> type;  // reference
-        std::optional<Dwarf_Off> location;
+        std::optional<dw_op_value> location;
         bool declaration;  // 不完全型のときtrue
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
@@ -174,6 +174,7 @@ struct dwarf_info
         Dwarf_Unsigned sibling;
         Dwarf_Unsigned endianity;                // DW_END_*
         std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
+        std::optional<dw_op_value> return_addr;
 
         // parameter/local変数も変数テーブルに登録して、Offsetをparameter情報として記憶しておく
         using var_node_t = Dwarf_Off;
@@ -198,6 +199,7 @@ struct dwarf_info
               sibling(0),
               endianity(0),
               specification(),
+              return_addr(),
               param_list(),
               local_var_list(),
               decl_file_name() {
