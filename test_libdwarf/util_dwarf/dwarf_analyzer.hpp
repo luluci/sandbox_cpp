@@ -574,6 +574,20 @@ private:
         if (!result) {
             utility::error_happen(&dw_error);
         }
+        // 関数情報チェック
+        // 関数定義を持つか？
+        bool has_define = false;
+        if (info.low_pc || info.high_pc || info.frame_base) {
+            // 関数定義を持つ場合、low_pc,high_pc,frame_baseを必ず持つと思われる
+            // プログラム内から呼び出されない関数(main関数(エントリーポイント),定義のみ関数)はframe_baseが無いと思われる
+            // 暫定でいずれかが出現していたらOKとしている
+            has_define = true;
+        }
+        if (info.declaration) {
+            // DW_AT_declarationはnon-definingと書かれている
+            has_define = false;
+        }
+        info.has_definition = has_define;
         //
         return die_info.offset;
     }

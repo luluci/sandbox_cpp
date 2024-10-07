@@ -195,7 +195,9 @@ int main(int argc, char *argv[]) {
         // dwarf解析
         using da_opt = util_dwarf::dwarf_analyze_option;
         da_opt daopt;
-        daopt.unset(da_opt::func_info_analyze | da_opt::no_impl_warning);
+        // daopt.unset(da_opt::func_info_analyze | da_opt::no_impl_warning);
+        daopt.unset(da_opt::no_impl_warning);
+        daopt.set(da_opt::func_info_analyze);
         di.analyze(dw_info, daopt);
         t = clock();
         printf("%f\n", static_cast<double>(t - s) / CLOCKS_PER_SEC);
@@ -224,12 +226,20 @@ int main(int argc, char *argv[]) {
         //     });
         //     return;
         // });
-        debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
-            printf("0x%08llX %30s\t%lld\t%s\t[array:%d, member:%d, bitfield:%d]\n", view.address, view.tag_type->c_str(), view.byte_size,
-                   view.tag_name->c_str(), view.is_array, view.is_member, view.is_bitfield);
+        if constexpr (true) {
+            debug_info.get_func_info([](util_dwarf::debug_info::func_info_view &view) -> bool {
+                printf("%s\n", view.tag_name->c_str());
+                return true;
+            });
+        }
+        if constexpr (false) {
+            debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
+                printf("0x%08llX %30s\t%lld\t%s\t[array:%d, member:%d, bitfield:%d]\n", view.address, view.tag_type->c_str(), view.byte_size,
+                       view.tag_name->c_str(), view.is_array, view.is_member, view.is_bitfield);
 
-            return true;
-        });
+                return true;
+            });
+        }
 
         di.close();
     }

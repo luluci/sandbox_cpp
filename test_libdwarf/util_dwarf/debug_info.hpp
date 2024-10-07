@@ -96,6 +96,8 @@ public:
               location(),
               type() {
         }
+        ~var_info() {
+        }
 
         void copy(dwarf_info::var_info &info) {
             // dwarf_infoから必要な情報をコピーする
@@ -176,6 +178,8 @@ public:
               has_bitfield(false),
               build_state(build_type_state::None) {
         }
+        ~type_info() {
+        }
     };
 
     // 変数情報
@@ -200,6 +204,8 @@ private:
 
 public:
     debug_info(dwarf_info &dw_info, option opt) : name_void("void"), dw_info_(dw_info), opt_(opt) {
+    }
+    ~debug_info() {
     }
 
     void build() {
@@ -813,6 +819,22 @@ public:
         }
     };
 
+    struct func_info_view
+    {
+        std::string *tag_type;
+        std::string *tag_name;
+        std::string *tag_decl_file_name;
+
+        Dwarf_Unsigned low_pc;
+        Dwarf_Unsigned high_pc;
+        bool is_declaration;
+        bool has_definition;
+
+        func_info_view()
+            : tag_type(nullptr), tag_name(nullptr), tag_decl_file_name(nullptr), low_pc(0), high_pc(0), is_declaration(false), has_definition(false) {
+        }
+    };
+
     struct lookup_mode
     {
         using type = uint32_t;
@@ -843,6 +865,20 @@ public:
                     }
                 }
             }
+        }
+    }
+
+    void get_func_info(std::function<bool(func_info_view &)> &&func) {
+        // funcをすべてチェック
+        auto &dw_func_tbl = dw_info_.func_tbl.container;
+        for (auto &[addr, func_info] : dw_func_tbl) {
+            func_info_view view;
+            view.tag_name           = &func_info.name;
+            view.tag_decl_file_name = &func_info.decl_file_name;
+            view.has_definition     = func_info.has_definition;
+            view.is_declaration     = func_info.declaration;
+            //
+            func(view);
         }
     }
 

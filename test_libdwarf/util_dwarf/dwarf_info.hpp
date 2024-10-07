@@ -67,6 +67,8 @@ struct dwarf_info
               is_parameter(false),
               is_local_var(false) {
         }
+        ~var_info() {
+        }
     };
 
     // 型タグ
@@ -170,6 +172,8 @@ struct dwarf_info
               param_list(),
               has_bitfield(false) {
         }
+        ~type_info() {
+        }
     };
 
     // 関数情報
@@ -181,15 +185,17 @@ struct dwarf_info
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
+        std::optional<Dwarf_Unsigned> low_pc;
+        std::optional<Dwarf_Unsigned> high_pc;
+        std::optional<dw_op_value> return_addr;
+        std::optional<dw_op_value> frame_base;
         std::optional<Dwarf_Off> type;  // reference
         std::optional<Dwarf_Off> location;
-        bool declaration;  // 不完全型のときtrue
+        bool declaration;  // 関数宣言のみが存在するときtrue?
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
         Dwarf_Unsigned endianity;                // DW_END_*
         std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
-        std::optional<dw_op_value> return_addr;
-        std::optional<dw_op_value> frame_base;
 
         // parameter/local変数も変数テーブルに登録して、Offsetをparameter情報として記憶しておく
         using var_node_t = Dwarf_Off;
@@ -199,6 +205,7 @@ struct dwarf_info
 
         // 付加情報
         std::string decl_file_name;
+        bool has_definition;  // 関数定義あり？
 
         func_info()
             : name(),
@@ -207,6 +214,10 @@ struct dwarf_info
               decl_file(0),
               decl_line(0),
               decl_column(0),
+              low_pc(),
+              high_pc(),
+              return_addr(),
+              frame_base(),
               type(),
               location(),
               declaration(false),
@@ -214,11 +225,12 @@ struct dwarf_info
               sibling(0),
               endianity(0),
               specification(),
-              return_addr(),
-              frame_base(),
               param_list(),
               local_var_list(),
-              decl_file_name() {
+              decl_file_name(),
+              has_definition(false) {
+        }
+        ~func_info() {
         }
     };
 
@@ -232,6 +244,8 @@ struct dwarf_info
 
     public:
         info_container() : container() {
+        }
+        ~info_container() {
         }
 
         // type_map操作関数
@@ -271,8 +285,8 @@ struct dwarf_info
         Dwarf_Unsigned language;
         Dwarf_Off stmt_list;
         std::string comp_dir;
-        Dwarf_Unsigned low_pc;
-        Dwarf_Unsigned high_pc;
+        std::optional<Dwarf_Unsigned> low_pc;
+        std::optional<Dwarf_Unsigned> high_pc;
         Dwarf_Unsigned ranges;  // .debug_rangesへの参照
 
         cu_info()
@@ -294,8 +308,10 @@ struct dwarf_info
               language(),
               stmt_list(0),
               comp_dir(),
-              low_pc(0),
-              high_pc(0) {
+              low_pc(),
+              high_pc() {
+        }
+        ~cu_info() {
         }
     };
 
@@ -312,6 +328,8 @@ struct dwarf_info
     // cu_info_container cu_tbl;
 
     dwarf_info() : machine_arch(), arch_info(nullptr) {
+    }
+    ~dwarf_info() {
     }
 };
 

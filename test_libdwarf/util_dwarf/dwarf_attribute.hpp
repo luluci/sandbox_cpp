@@ -488,13 +488,13 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_low_pc:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::cu_info> || std::is_same_v<T, dwarf_info::func_info>) {
                 get_DW_AT_low_pc<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_high_pc:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::cu_info> || std::is_same_v<T, dwarf_info::func_info>) {
                 get_DW_AT_high_pc<DW_TAG>(dw_info, info);
             }
             return;
@@ -636,7 +636,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_external:
-            if constexpr (std::is_same_v<T, dwarf_info::var_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::var_info> || std::is_same_v<T, dwarf_info::func_info>) {
                 get_DW_AT_external<DW_TAG>(dw_info, info);
             }
             return;
