@@ -819,22 +819,6 @@ public:
         }
     };
 
-    struct func_info_view
-    {
-        std::string *tag_type;
-        std::string *tag_name;
-        std::string *tag_decl_file_name;
-
-        Dwarf_Unsigned low_pc;
-        Dwarf_Unsigned high_pc;
-        bool is_declaration;
-        bool has_definition;
-
-        func_info_view()
-            : tag_type(nullptr), tag_name(nullptr), tag_decl_file_name(nullptr), low_pc(0), high_pc(0), is_declaration(false), has_definition(false) {
-        }
-    };
-
     struct lookup_mode
     {
         using type = uint32_t;
@@ -868,7 +852,25 @@ public:
         }
     }
 
+    struct func_info_view
+    {
+        std::string *tag_type;
+        std::string *tag_name;
+        std::string *tag_decl_file_name;
+
+        Dwarf_Unsigned low_pc;
+        Dwarf_Unsigned high_pc;
+        bool is_declaration;
+        bool has_definition;
+
+        func_info_view()
+            : tag_type(nullptr), tag_name(nullptr), tag_decl_file_name(nullptr), low_pc(0), high_pc(0), is_declaration(false), has_definition(false) {
+        }
+    };
+
     void get_func_info(std::function<bool(func_info_view &)> &&func) {
+        bool result;
+
         // funcをすべてチェック
         auto &dw_func_tbl = dw_info_.func_tbl.container;
         for (auto &[addr, func_info] : dw_func_tbl) {
@@ -878,7 +880,10 @@ public:
             view.has_definition     = func_info.has_definition;
             view.is_declaration     = func_info.declaration;
             //
-            func(view);
+            result = func(view);
+            if (!result) {
+                break;
+            }
         }
     }
 
