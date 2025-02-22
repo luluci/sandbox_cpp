@@ -263,10 +263,35 @@ int main(int argc, char *argv[]) {
             });
         }
         if constexpr (true) {
-            debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
-                printf("0x%08llX %30s\t%lld\t%s\t[array:%d, member:%d, bitfield:%d]\n", view.address, view.tag_type->c_str(), view.byte_size,
-                       view.tag_name->c_str(), view.is_array, view.is_struct_member, view.is_bitfield);
+            int typelen = static_cast<int>(debug_info.max_typename_len);
 
+            debug_info.get_var_info([typelen](util_dwarf::debug_info::var_info_view &view) -> bool {
+                printf("0x%08llX %*s\t%lld\t%s\t[", view.address, typelen, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
+                if (view.is_array) {
+                    printf("array, ");
+                }
+                if (view.is_struct) {
+                    printf("struct, ");
+                }
+                if (view.is_union) {
+                    printf("union, ");
+                }
+                if (view.is_enum) {
+                    printf("enum, ");
+                }
+                if (view.is_const) {
+                    printf("const, ");
+                }
+                if (view.is_struct_member) {
+                    printf("struct_member, ");
+                }
+                if (view.is_union_member) {
+                    printf("union_member, ");
+                }
+                if (view.is_unnamed) {
+                    printf("is_unnamed, ");
+                }
+                printf("]\n");
                 return true;
             });
         }

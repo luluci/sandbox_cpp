@@ -197,6 +197,10 @@ public:
     std::string name_void;
     std::string name_unnamed;
 
+    // その他解析情報
+    std::size_t max_typename_len;  // 最大型名文字列長
+    std::size_t max_varname_len;   // 最大変数名文字列長
+
 private:
     dwarf_info &dw_info_;
 
@@ -204,7 +208,8 @@ private:
     option opt_;
 
 public:
-    debug_info(dwarf_info &dw_info, option opt) : name_void("void"), name_unnamed("<unnamed>"), dw_info_(dw_info), opt_(opt) {
+    debug_info(dwarf_info &dw_info, option opt)
+        : name_void("void"), name_unnamed("<unnamed>"), max_typename_len(0), max_varname_len(0), dw_info_(dw_info), opt_(opt) {
     }
     ~debug_info() {
     }
@@ -214,6 +219,10 @@ public:
         build_type_info();
     }
     void build_var_info() {
+        // 付加情報初期化
+        // 最大変数名文字列長
+        max_varname_len = 0;
+
         // ソート用に変数リストへのポインタをリストアップする
         auto &dw_var_tbl = dw_info_.var_tbl.container;
         for (auto &[offset, elem] : dw_var_tbl) {
@@ -231,6 +240,16 @@ public:
                         // dwarf_infoからデータコピー
                         auto info = std::make_unique<var_info>();
                         info->copy(elem);
+
+                        // 付加情報作成
+                        if (info->name != nullptr) {
+                            if (max_varname_len < info->name->size()) {
+                                max_varname_len = info->name->size();
+                            }
+                        } else {
+                            // ありえない？
+                        }
+
                         // map追加
                         var_tbl.insert(std::make_pair(addr, std::move(info)));
                     }
@@ -243,10 +262,26 @@ public:
         // ルートオブジェクトに情報を集約して型情報を単一にする
         auto &dw_type_map = dw_info_.type_tbl.container;
 
+        // 付加情報初期化
+        // 最大型名文字列長
+        max_typename_len = 0;
+
         for (auto &elem : dw_type_map) {
-            // 集約ノード取得
             // ダミー取得をして情報の作成を行う
-            get_type_info(elem.first);
+            auto info = get_type_info(elem.first);
+            // 付加情報作成
+            // 最大型名文字列長
+            if (info->name != nullptr) {
+                if (max_typename_len < info->name->size()) {
+                    max_typename_len = info->name->size();
+                }
+            } else {
+                // この時点でunnamed==nullptrがありうる
+                // 後でname_unnamed表示用に使う文字列から最長のもので判定
+                if (max_typename_len < name_unnamed.size()) {
+                    max_typename_len = name_unnamed.size();
+                }
+            }
         }
     }
 
@@ -796,6 +831,8 @@ public:
         bool is_array;
         bool is_bitfield;
         bool is_const;
+        //
+        bool is_unnamed;
 
         var_info_view()
             : tag_type(nullptr),
@@ -815,7 +852,8 @@ public:
               is_union_member(false),
               is_array(false),
               is_bitfield(false),
-              is_const(false) {
+              is_const(false),
+              is_unnamed(false) {
         }
     };
 
@@ -901,24 +939,28 @@ private:
             view.is_struct = true;
             // unnamedの場合
             if (type.name == nullptr) {
-                view.tag_type = &name_unnamed;
+                view.tag_type   = &name_unnamed;
+                view.is_unnamed = true;
             }
         } else if ((type.tag & util_dwarf::debug_info::type_tag::union_) != 0) {
             view.is_union = true;
             // unnamedの場合
             if (type.name == nullptr) {
-                view.tag_type = &name_unnamed;
+                view.tag_type   = &name_unnamed;
+                view.is_unnamed = true;
             }
         } else if ((type.tag & util_dwarf::debug_info::type_tag::enum_) != 0) {
             view.is_enum = true;
             // unnamedの場合
             if (type.name == nullptr) {
-                view.tag_type = &name_unnamed;
+                view.tag_type   = &name_unnamed;
+                view.is_unnamed = true;
             }
         } else {
             // ありえない？
             if (type.name == nullptr) {
-                view.tag_type = &name_void;
+                view.tag_type   = &name_void;
+                view.is_unnamed = true;
             }
         }
 
@@ -972,6 +1014,16 @@ private:
             return true;
         }
 
+        // struct or union判定
+        bool is_struct_union = false;
+        if ((type.tag & util_dwarf::debug_info::type_tag::struct_) != 0) {
+            is_struct_union = false;
+        } else if ((type.tag & util_dwarf::debug_info::type_tag::union_) != 0) {
+            is_struct_union = true;
+        } else {
+            // ありえない?
+        }
+
         for (auto &mem : *type.member_list) {
             // memberが変数名になる
             auto &member = *mem;
@@ -981,7 +1033,7 @@ private:
                 member_type = member.sub_info;
             }
             // member毎処理
-            result = lookup_var_member_each(member, *member_type, base_address, prefix, depth, func);
+            result = lookup_var_member_each(member, *member_type, base_address, prefix, depth, func, is_struct_union);
             if (!result) {
                 break;
             }
@@ -990,7 +1042,8 @@ private:
         return result;
     }
     template <typename Func>
-    bool lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &var_name, size_t depth, Func &func) {
+    bool lookup_var_member_each(type_info &member, type_info &type, Dwarf_Off base_address, std::string &var_name, size_t depth, Func &func,
+                                bool is_struct_union) {
         bool result;
         Dwarf_Off address;
         var_info_view view;
@@ -1000,8 +1053,8 @@ private:
         address = base_address + member.data_member_location;
         // view作成
         view.tag_name         = &var_name;
-        view.is_struct_member = true;
-        view.is_union_member  = true;
+        view.is_struct_member = !is_struct_union;
+        view.is_union_member  = is_struct_union;
         view.is_const         = type.is_const;
 
         // prefix部分の末尾を記憶しておく
