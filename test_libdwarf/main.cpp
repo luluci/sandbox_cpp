@@ -5,6 +5,7 @@
 #include <format>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 #include "util_dwarf/debug_info.hpp"
@@ -185,8 +186,34 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    // コマンドライン引数チェック
+    char const *file_path = nullptr;
+    bool is_cmdline_ok    = false;
+    bool is_prior_typedef = false;
+    if (argc > 1) {
+        int arg_idx = 1;
+        // 末尾以外をチェック
+        while (arg_idx < argc - 1) {
+            std::string_view arg(argv[arg_idx]);
+            if (arg.find("--prior-typedef") == 0) {
+                is_prior_typedef = true;
+            }
+            arg_idx++;
+        }
+        // 末尾はファイル名
+        file_path     = argv[argc - 1];
+        is_cmdline_ok = true;
+    }
+    if (!is_cmdline_ok) {
+        printf("Usage: %s [options] <dwarf file>\n", argv[0]);
+        printf("\n");
+        printf("options:\n");
+        printf("  --prior-typedef : prior typedef name\n");
+        return -1;
+    }
+
     util_dwarf::dwarf_analyzer di;
-    auto result = di.open(argv[1]);
+    auto result = di.open(file_path);
     if (result) {
         util_dwarf::dwarf_info dw_info;
 
@@ -202,9 +229,12 @@ int main(int argc, char *argv[]) {
         t = clock();
         printf("%f\n", static_cast<double>(t - s) / CLOCKS_PER_SEC);
 
-        //
+        // 全optionは初期値でfalse
         using diopt = util_dwarf::debug_info::option;
         diopt opt;
+        if (is_prior_typedef) {
+            opt.set(diopt::prior_typedef);
+        }
         // opt.set(diopt::expand_array);
         // opt.set(diopt::through_typedef | diopt::expand_array);
         // opt.unset(diopt::through_typedef);
@@ -226,16 +256,16 @@ int main(int argc, char *argv[]) {
         //     });
         //     return;
         // });
-        if constexpr (true) {
+        if constexpr (false) {
             debug_info.get_func_info([](util_dwarf::debug_info::func_info_view &view) -> bool {
                 printf("%s\n", view.tag_name->c_str());
                 return true;
             });
         }
-        if constexpr (false) {
+        if constexpr (true) {
             debug_info.get_var_info([](util_dwarf::debug_info::var_info_view &view) -> bool {
                 printf("0x%08llX %30s\t%lld\t%s\t[array:%d, member:%d, bitfield:%d]\n", view.address, view.tag_type->c_str(), view.byte_size,
-                       view.tag_name->c_str(), view.is_array, view.is_member, view.is_bitfield);
+                       view.tag_name->c_str(), view.is_array, view.is_struct_member, view.is_bitfield);
 
                 return true;
             });

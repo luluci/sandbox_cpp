@@ -24,14 +24,14 @@ public:
         enum mode : type
         {
             none,
-            through_typedef = 1 << 0,
-            expand_array    = 1 << 1,
+            prior_typedef = 1 << 0,
+            expand_array  = 1 << 1,
         };
 
-        bool is_through_typedef;
+        bool is_prior_typedef;  // typedefの名前を優先する
         bool is_expand_array;
 
-        option(type flags = none) : is_through_typedef(true), is_expand_array(false) {
+        option(type flags = none) : is_prior_typedef(false), is_expand_array(false) {
             set(flags);
         }
 
@@ -44,8 +44,8 @@ public:
 
     private:
         void set_impl(type flags, bool value) {
-            if (check_flag(flags, through_typedef)) {
-                is_through_typedef = value;
+            if (check_flag(flags, prior_typedef)) {
+                is_prior_typedef = value;
             }
             if (check_flag(flags, expand_array)) {
                 is_expand_array = value;
@@ -589,11 +589,13 @@ private:
     }
 
     bool adapt_info_typedef(type_info &dbg_info, dwarf_info::type_info &dw_info) {
-        // 対象データが空ならdw_infoを反映する
-        if (opt_.is_through_typedef) {
-            adapt_value(dbg_info.name, dw_info.name);
-        } else {
+        if (opt_.is_prior_typedef) {
+            // typedef名称を優先する場合
+            // dw_infoがtypedef名称になるので優先する
             adapt_value_force(dbg_info.name, dw_info.name);
+        } else {
+            // typedefより定義元の名前を優先する場合
+            adapt_value(dbg_info.name, dw_info.name);
         }
         //
         dbg_info.tag |= dw_info.tag;
@@ -794,7 +796,8 @@ public:
         size_t pointer_depth;
         bool is_struct;
         bool is_union;
-        bool is_member;
+        bool is_struct_member;
+        bool is_union_member;
         bool is_array;
         bool is_bitfield;
         bool is_const;
@@ -812,7 +815,8 @@ public:
               pointer_depth(0),
               is_struct(false),
               is_union(false),
-              is_member(false),
+              is_struct_member(false),
+              is_union_member(false),
               is_array(false),
               is_bitfield(false),
               is_const(false) {
@@ -982,9 +986,10 @@ private:
         // アドレス計算
         address = base_address + member.data_member_location;
         // view作成
-        view.tag_name  = &var_name;
-        view.is_member = true;
-        view.is_const  = type.is_const;
+        view.tag_name         = &var_name;
+        view.is_struct_member = true;
+        view.is_union_member  = true;
+        view.is_const         = type.is_const;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();
