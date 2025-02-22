@@ -13,7 +13,10 @@
                 "${workspaceFolder}/test_build_arm_gcc.out",
                 "${workspaceFolder}/test_build_esp32s3.out",
                 "${workspaceFolder}/dwarf_test_clang.out",
-                "${workspaceFolder}/abs_test_RX.abs"
+                //
+                //"--prior-typedef",
+                //
+                "${workspaceFolder}/abs_test_RX.abs",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

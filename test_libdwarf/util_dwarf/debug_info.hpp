@@ -122,7 +122,7 @@ public:
     {
         uint16_t tag;
 
-        std::string *name;
+        std::string *name;  // unnamedのときはnullptrになる
         Dwarf_Unsigned byte_size;
         Dwarf_Unsigned bit_offset;
         Dwarf_Unsigned bit_size;
@@ -195,6 +195,7 @@ public:
 
     // 固定情報
     std::string name_void;
+    std::string name_unnamed;
 
 private:
     dwarf_info &dw_info_;
@@ -203,7 +204,7 @@ private:
     option opt_;
 
 public:
-    debug_info(dwarf_info &dw_info, option opt) : name_void("void"), dw_info_(dw_info), opt_(opt) {
+    debug_info(dwarf_info &dw_info, option opt) : name_void("void"), name_unnamed("<unnamed>"), dw_info_(dw_info), opt_(opt) {
     }
     ~debug_info() {
     }
@@ -400,15 +401,20 @@ private:
         if (dbg_info.tag == 0) {
             dbg_info.tag = type_tag::none;
         }
-        // unnamedのときはvoid型？
-        if (dbg_info.name == nullptr) {
-            dbg_info.name = &name_void;
+        // unnamedのとき
+        // 下記のようなケースがある。
+        //   typedef struct {} type;
+        //   enum {};
+        // typedef出現時にnullptrであれば上書き判定が簡単になるので、nullptrのままにしておく
+        // nullptr==unnamedとして後で処理
+        // if (dbg_info.name == nullptr) {
+        //     dbg_info.name = &name_void;
 
-            // pointer size
-            if (dbg_info.byte_size == 0) {
-                dbg_info.byte_size = dw_info_.machine_arch.obj_pointersize;
-            }
-        }
+        //     // pointer size
+        //     if (dbg_info.byte_size == 0) {
+        //         dbg_info.byte_size = dw_info_.machine_arch.obj_pointersize;
+        //     }
+        // }
         // byte_sizeケア
         if (dbg_info.byte_size == 0) {
             // 関数ポインタのとき？
@@ -443,10 +449,6 @@ private:
     }
 
     bool adapt_info_enum(type_info &dbg_info, dwarf_info::type_info &dw_info) {
-        // dwarfデータのnameが空の場合は無名定義
-        if (dw_info.name.size() == 0) {
-            dw_info.name = "<unnamed>";
-        }
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -458,10 +460,6 @@ private:
 
     bool adapt_info_member(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         bool is_comple = true;
-        // dwarfデータのnameが空の場合は無名定義
-        if (dw_info.name.size() == 0) {
-            dw_info.name = "<unnamed>";
-        }
         // 対象データが空ならdw_infoを反映する
         adapt_value_force(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -604,10 +602,6 @@ private:
     }
 
     bool adapt_info_struct_union(type_info &dbg_info, dwarf_info::type_info &dw_info) {
-        // dwarfデータのnameが空の場合は無名定義
-        if (dw_info.name.size() == 0) {
-            dw_info.name = "<unnamed>";
-        }
         // 対象データが空ならdw_infoを反映する
         adapt_value(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -796,6 +790,7 @@ public:
         size_t pointer_depth;
         bool is_struct;
         bool is_union;
+        bool is_enum;
         bool is_struct_member;
         bool is_union_member;
         bool is_array;
@@ -815,6 +810,7 @@ public:
               pointer_depth(0),
               is_struct(false),
               is_union(false),
+              is_enum(false),
               is_struct_member(false),
               is_union_member(false),
               is_array(false),
@@ -896,19 +892,36 @@ private:
         // pointer
         view.pointer_depth = type.pointer_depth;
         // type情報タグを作成
+        // 型がnamedならそのまま名前として設定
         if (type.name != nullptr) {
             view.tag_type = type.name;
-            if ((type.tag & util_dwarf::debug_info::type_tag::struct_) != 0) {
-                view.is_struct = true;
-            } else if ((type.tag & util_dwarf::debug_info::type_tag::union_) != 0) {
-                view.is_union = true;
-            } else {
-                //
+        }
+        // typeに応じた付加情報をセット
+        if ((type.tag & util_dwarf::debug_info::type_tag::struct_) != 0) {
+            view.is_struct = true;
+            // unnamedの場合
+            if (type.name == nullptr) {
+                view.tag_type = &name_unnamed;
+            }
+        } else if ((type.tag & util_dwarf::debug_info::type_tag::union_) != 0) {
+            view.is_union = true;
+            // unnamedの場合
+            if (type.name == nullptr) {
+                view.tag_type = &name_unnamed;
+            }
+        } else if ((type.tag & util_dwarf::debug_info::type_tag::enum_) != 0) {
+            view.is_enum = true;
+            // unnamedの場合
+            if (type.name == nullptr) {
+                view.tag_type = &name_unnamed;
             }
         } else {
-            // ありえない
-            view.tag_type = &name_void;
+            // ありえない？
+            if (type.name == nullptr) {
+                view.tag_type = &name_void;
+            }
         }
+
         //
         view.encoding = type.encoding;
     }
