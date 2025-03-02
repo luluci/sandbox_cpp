@@ -76,6 +76,7 @@ public:
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
+        std::string *decl_file_name;
         bool declaration;  // 不完全型のときtrue
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
@@ -89,6 +90,7 @@ public:
               decl_file(0),
               decl_line(0),
               decl_column(0),
+              decl_file_name(nullptr),
               declaration(false),
               const_value(0),
               sibling(0),
@@ -101,15 +103,16 @@ public:
 
         void copy(dwarf_info::var_info &info) {
             // dwarf_infoから必要な情報をコピーする
-            name        = &(info.name);
-            external    = info.external;
-            decl_file   = info.decl_file;
-            decl_line   = info.decl_line;
-            decl_column = info.decl_column;
-            declaration = info.declaration;
-            const_value = info.const_value;
-            sibling     = info.sibling;
-            endianity   = info.endianity;
+            name           = &(info.name);
+            external       = info.external;
+            decl_file      = info.decl_file;
+            decl_line      = info.decl_line;
+            decl_column    = info.decl_column;
+            decl_file_name = &(info.decl_file_name);
+            declaration    = info.declaration;
+            const_value    = info.const_value;
+            sibling        = info.sibling;
+            endianity      = info.endianity;
             if (info.type)
                 type = *info.type;
             if (info.location)
@@ -131,6 +134,7 @@ public:
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
+        std::string *decl_file_name;
         Dwarf_Unsigned encoding;  // DW_ATE_*
         Dwarf_Unsigned count;
         Dwarf_Unsigned address_class;
@@ -169,6 +173,7 @@ public:
               decl_file(0),
               decl_line(0),
               decl_column(0),
+              decl_file_name(nullptr),
               encoding(0),
               count(0),
               address_class(0),
@@ -380,7 +385,10 @@ private:
     }
 
     bool adapt_info(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // type情報
         adapt_value(dbg_info.type, dw_info.type);
+        // decl_*情報
+        adapt_decl_info(dbg_info, dw_info);
 
         switch (dw_info.tag) {
             case type_tag::base:
@@ -475,6 +483,17 @@ private:
                 sub_type.count     = 0;
                 sub_type.tag &= ~(type_tag::array);
             }
+        }
+    }
+
+    void adapt_decl_info(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // decl_*情報
+        adapt_value(dbg_info.decl_file, dw_info.decl_file);
+        adapt_value(dbg_info.decl_line, dw_info.decl_line);
+        adapt_value(dbg_info.decl_column, dw_info.decl_column);
+        // 文字列情報
+        if (dbg_info.decl_file_name == nullptr && dw_info.decl_file_name.size() > 0) {
+            dbg_info.decl_file_name = &(dw_info.decl_file_name);
         }
     }
 
