@@ -496,6 +496,16 @@ private:
             dbg_info.decl_file_name = &(dw_info.decl_file_name);
         }
     }
+    void adapt_decl_info_force(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // decl_*情報
+        adapt_value_force(dbg_info.decl_file, dw_info.decl_file);
+        adapt_value_force(dbg_info.decl_line, dw_info.decl_line);
+        adapt_value_force(dbg_info.decl_column, dw_info.decl_column);
+        // 文字列情報
+        if (dw_info.decl_file_name.size() > 0) {
+            dbg_info.decl_file_name = &(dw_info.decl_file_name);
+        }
+    }
 
     bool adapt_info_base(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // 対象データが空ならdw_infoを反映する
@@ -520,6 +530,7 @@ private:
 
     bool adapt_info_member(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         bool is_comple = true;
+        adapt_decl_info_force(dbg_info, dw_info);
         // 対象データが空ならdw_infoを反映する
         adapt_value_force(dbg_info.name, dw_info.name);
         adapt_value(dbg_info.byte_size, dw_info.byte_size);
@@ -804,6 +815,11 @@ private:
             dst = src;
         }
     }
+    void adapt_value_force(Dwarf_Unsigned &dst, Dwarf_Unsigned &src) {
+        if (src != 0) {
+            dst = src;
+        }
+    }
     void adapt_value(debug_info::type_info::child_list_t *&dst, dwarf_info::type_info::child_list_t &src) {
         if (dst == nullptr && src.size() > 0) {
             type_info::child_list_t list;
@@ -847,6 +863,16 @@ public:
         Dwarf_Unsigned encoding;  // DW_ATE_*
         Dwarf_Off data_member_location;
 
+        // 定義位置情報
+        Dwarf_Unsigned var_decl_file;
+        Dwarf_Unsigned var_decl_line;
+        Dwarf_Unsigned var_decl_column;
+        std::string *var_decl_file_name;
+        Dwarf_Unsigned type_decl_file;
+        Dwarf_Unsigned type_decl_line;
+        Dwarf_Unsigned type_decl_column;
+        std::string *type_decl_file_name;
+
         size_t pointer_depth;
         bool is_struct;
         bool is_union;
@@ -856,6 +882,7 @@ public:
         bool is_array;
         bool is_bitfield;
         bool is_const;
+
         //
         bool is_unnamed;
 
@@ -869,6 +896,14 @@ public:
               data_bit_offset(0),
               encoding(0),
               data_member_location(0),
+              var_decl_file(0),
+              var_decl_line(0),
+              var_decl_column(0),
+              var_decl_file_name(nullptr),
+              type_decl_file(0),
+              type_decl_line(0),
+              type_decl_column(0),
+              type_decl_file_name(nullptr),
               pointer_depth(0),
               is_struct(false),
               is_union(false),
@@ -1011,6 +1046,15 @@ private:
         // view作成
         view.tag_name = &var_name;
         view.is_const = type.is_const;
+        // decl_*
+        view.var_decl_file       = var.decl_file;
+        view.var_decl_line       = var.decl_line;
+        view.var_decl_column     = var.decl_column;
+        view.var_decl_file_name  = var.decl_file_name;
+        view.type_decl_file      = type.decl_file;
+        view.type_decl_line      = type.decl_line;
+        view.type_decl_column    = type.decl_column;
+        view.type_decl_file_name = type.decl_file_name;
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
@@ -1081,6 +1125,15 @@ private:
         view.is_struct_member = !is_struct_union;
         view.is_union_member  = is_struct_union;
         view.is_const         = type.is_const;
+        // decl_*
+        view.var_decl_file       = member.decl_file;
+        view.var_decl_line       = member.decl_line;
+        view.var_decl_column     = member.decl_column;
+        view.var_decl_file_name  = member.decl_file_name;
+        view.type_decl_file      = type.decl_file;
+        view.type_decl_line      = type.decl_line;
+        view.type_decl_column    = type.decl_column;
+        view.type_decl_file_name = type.decl_file_name;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();
