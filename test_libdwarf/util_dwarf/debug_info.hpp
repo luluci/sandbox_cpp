@@ -128,6 +128,9 @@ public:
         Dwarf_Unsigned bit_size;
         Dwarf_Unsigned data_bit_offset;
         Dwarf_Off data_member_location;
+        Dwarf_Unsigned decl_file;  // filelistのインデックス
+        Dwarf_Unsigned decl_line;
+        Dwarf_Unsigned decl_column;
         Dwarf_Unsigned encoding;  // DW_ATE_*
         Dwarf_Unsigned count;
         Dwarf_Unsigned address_class;
@@ -163,6 +166,9 @@ public:
               bit_size(0),
               data_bit_offset(0),
               data_member_location(0),
+              decl_file(0),
+              decl_line(0),
+              decl_column(0),
               encoding(0),
               count(0),
               address_class(0),

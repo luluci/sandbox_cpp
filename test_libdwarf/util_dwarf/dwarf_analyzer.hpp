@@ -520,6 +520,15 @@ private:
         fprintf(stderr, "no impl : %s (%u)\n", name, die_info.tag);
     }
 
+    template <typename T>
+    void analyze_extra_info(T &info) {
+        // decl_fileチェック
+        if (0 < info.decl_file && info.decl_file < analyze_info_.file_list.size()) {
+            // file_listからこの変数が定義されたファイル名を取得できる
+            info.decl_file_name = analyze_info_.file_list[info.decl_file];
+        }
+    }
+
     // // DW_TAG_*に0がアサインされていないことを前提として、TAG無指定のみ有効化している
     // template <Dwarf_Half Tag = 0>
     // auto analyze_DW_TAG(Dwarf_Die die, die_info_t &die_info) -> std::enable_if_t<Tag == 0> {
@@ -534,10 +543,8 @@ private:
         // 変数情報作成
         auto &&info = dw_info.var_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_variable>(die, analyze_info_, info);
-        // decl_fileチェック
-        if (info.decl_file > 0) {
-            // file_listからこの変数が定義されたファイル名を取得できる
-        }
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_variable");
@@ -560,11 +567,8 @@ private:
         // 関数情報作成
         auto &&info = dw_info.func_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_subprogram>(die, analyze_info_, info);
-        // decl_fileチェック
-        if (0 < info.decl_file && info.decl_file < analyze_info_.file_list.size()) {
-            // file_listからこの変数が定義されたファイル名を取得できる
-            info.decl_file_name = analyze_info_.file_list[info.decl_file];
-        }
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
             analyze_DW_TAG_subprogram_child(child, dw_info, die_info, info);
@@ -635,6 +639,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_base_type>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_base_type");
@@ -652,6 +658,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_enumeration_type>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
             analyze_DW_TAG_enumeration_type_child(child, dw_info, die_info, info);
@@ -692,6 +700,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_enumerator>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_enumerator");
@@ -718,6 +728,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
             analyze_DW_TAG_struct_union_child<DW_TAG>(child, dw_info, die_info, info);
@@ -803,6 +815,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_member>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_member");
@@ -821,6 +835,8 @@ private:
         analyze_DW_AT<DW_TAG_array_type>(die, analyze_info_, info);
         // omitチェック
         check_omitted_type_info(info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
             analyze_DW_TAG_array_type_child(child, dw_info, die_info, info);
@@ -870,6 +886,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_subrange_type>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // boundで表現されていたらcountに変換
         // lowerは0のとき省略されることがある
         Dwarf_Unsigned lower = 0;
@@ -900,6 +918,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_subroutine_type>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェック
         bool result = get_child_die(die, [this, &dw_info, &die_info, &info](Dwarf_Die child) -> bool {
             analyze_DW_TAG_subroutine_type_child(child, dw_info, die_info, info);
@@ -938,10 +958,8 @@ private:
         // 変数情報作成
         auto &&info = dw_info.var_tbl.make_new_info(die_info.offset);
         analyze_DW_AT<DW_TAG_formal_parameter>(die, analyze_info_, info);
-        // decl_fileチェック
-        if (info.decl_file > 0) {
-            // file_listからこの変数が定義されたファイル名を取得できる
-        }
+        // 付加情報解析
+        analyze_extra_info(info);
         // parameterマーク
         info.is_parameter = true;
 
@@ -973,6 +991,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_reference_type>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_reference_type");
@@ -989,6 +1009,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_const/pointer/restrict/volatile_type");
@@ -1004,6 +1026,8 @@ private:
         info.offset = offset;
 
         analyze_DW_AT<DW_TAG_typedef>(die, analyze_info_, info);
+        // 付加情報解析
+        analyze_extra_info(info);
         // child dieチェックしない
         // childが存在したら表示だけ出しておく
         debug_dump_no_impl_child(die, "DW_TAG_typedef");
