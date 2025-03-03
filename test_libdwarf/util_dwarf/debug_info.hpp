@@ -878,11 +878,13 @@ public:
         Dwarf_Unsigned var_decl_file;
         Dwarf_Unsigned var_decl_line;
         Dwarf_Unsigned var_decl_column;
-        std::string *var_decl_file_name;
+        std::string *var_decl_file_path;
+        std::string *var_decl_file_path_rel;
         Dwarf_Unsigned type_decl_file;
         Dwarf_Unsigned type_decl_line;
         Dwarf_Unsigned type_decl_column;
-        std::string *type_decl_file_name;
+        std::string *type_decl_file_path;
+        std::string *type_decl_file_path_rel;
 
         size_t pointer_depth;
         bool is_struct;
@@ -910,11 +912,13 @@ public:
               var_decl_file(0),
               var_decl_line(0),
               var_decl_column(0),
-              var_decl_file_name(nullptr),
+              var_decl_file_path(nullptr),
+              var_decl_file_path_rel(nullptr),
               type_decl_file(0),
               type_decl_line(0),
               type_decl_column(0),
-              type_decl_file_name(nullptr),
+              type_decl_file_path(nullptr),
+              type_decl_file_path_rel(nullptr),
               pointer_depth(0),
               is_struct(false),
               is_union(false),
@@ -965,7 +969,8 @@ public:
     {
         std::string *tag_type;
         std::string *tag_name;
-        std::string *tag_decl_file_name;
+        std::string *tag_decl_file_path;
+        std::string *tag_decl_file_path_rel;
 
         Dwarf_Unsigned low_pc;
         Dwarf_Unsigned high_pc;
@@ -973,7 +978,14 @@ public:
         bool has_definition;
 
         func_info_view()
-            : tag_type(nullptr), tag_name(nullptr), tag_decl_file_name(nullptr), low_pc(0), high_pc(0), is_declaration(false), has_definition(false) {
+            : tag_type(nullptr),
+              tag_name(nullptr),
+              tag_decl_file_path(nullptr),
+              tag_decl_file_path_rel(nullptr),
+              low_pc(0),
+              high_pc(0),
+              is_declaration(false),
+              has_definition(false) {
         }
     };
 
@@ -984,10 +996,11 @@ public:
         auto &dw_func_tbl = dw_info_.func_tbl.container;
         for (auto &[addr, func_info] : dw_func_tbl) {
             func_info_view view;
-            view.tag_name           = &func_info.name;
-            view.tag_decl_file_name = &func_info.decl_file_path;
-            view.has_definition     = func_info.has_definition;
-            view.is_declaration     = func_info.declaration;
+            view.tag_name               = &func_info.name;
+            view.tag_decl_file_path     = &func_info.decl_file_path;
+            view.tag_decl_file_path_rel = &func_info.decl_file_path_rel;
+            view.has_definition         = func_info.has_definition;
+            view.is_declaration         = func_info.declaration;
             //
             result = func(view);
             if (!result) {
@@ -1058,14 +1071,16 @@ private:
         view.tag_name = &var_name;
         view.is_const = type.is_const;
         // decl_*
-        view.var_decl_file       = var.decl_file;
-        view.var_decl_line       = var.decl_line;
-        view.var_decl_column     = var.decl_column;
-        view.var_decl_file_name  = var.decl_file_path;
-        view.type_decl_file      = type.decl_file;
-        view.type_decl_line      = type.decl_line;
-        view.type_decl_column    = type.decl_column;
-        view.type_decl_file_name = type.decl_file_path;
+        view.var_decl_file           = var.decl_file;
+        view.var_decl_line           = var.decl_line;
+        view.var_decl_column         = var.decl_column;
+        view.var_decl_file_path      = var.decl_file_path;
+        view.var_decl_file_path_rel  = var.decl_file_path_rel;
+        view.type_decl_file          = type.decl_file;
+        view.type_decl_line          = type.decl_line;
+        view.type_decl_column        = type.decl_column;
+        view.type_decl_file_path     = type.decl_file_path;
+        view.type_decl_file_path_rel = type.decl_file_path_rel;
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
@@ -1137,14 +1152,16 @@ private:
         view.is_union_member  = is_struct_union;
         view.is_const         = type.is_const;
         // decl_*
-        view.var_decl_file       = member.decl_file;
-        view.var_decl_line       = member.decl_line;
-        view.var_decl_column     = member.decl_column;
-        view.var_decl_file_name  = member.decl_file_path;
-        view.type_decl_file      = type.decl_file;
-        view.type_decl_line      = type.decl_line;
-        view.type_decl_column    = type.decl_column;
-        view.type_decl_file_name = type.decl_file_path;
+        view.var_decl_file           = member.decl_file;
+        view.var_decl_line           = member.decl_line;
+        view.var_decl_column         = member.decl_column;
+        view.var_decl_file_path      = member.decl_file_path;
+        view.var_decl_file_path_rel  = member.decl_file_path_rel;
+        view.type_decl_file          = type.decl_file;
+        view.type_decl_line          = type.decl_line;
+        view.type_decl_column        = type.decl_column;
+        view.type_decl_file_path     = type.decl_file_path;
+        view.type_decl_file_path_rel = type.decl_file_path_rel;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();
