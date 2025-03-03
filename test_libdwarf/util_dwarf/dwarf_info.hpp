@@ -244,6 +244,63 @@ struct dwarf_info
         }
     };
 
+    // compile_unitから取得する情報
+    struct cu_info_header
+    {
+        // compile_unit info
+        Dwarf_Unsigned cu_header_length;
+        Dwarf_Half version_stamp;
+        Dwarf_Off abbrev_offset;
+        Dwarf_Half address_size;
+        Dwarf_Half length_size;
+        Dwarf_Half extension_size;
+        Dwarf_Sig8 type_signature;
+        Dwarf_Unsigned typeoffset;
+        Dwarf_Unsigned next_cu_header_offset;
+        Dwarf_Half header_cu_type;
+        //
+        Dwarf_Off cu_offset;
+        Dwarf_Off cu_header_offset;
+        Dwarf_Off cu_length;
+
+        cu_info_header()
+            : cu_header_length(0),
+              version_stamp(0),
+              abbrev_offset(0),
+              address_size(0),
+              length_size(0),
+              extension_size(0),
+              type_signature({0}),
+              typeoffset(0),
+              next_cu_header_offset(0),
+              header_cu_type(0),
+              cu_offset(0),
+              cu_header_offset(0),
+              cu_length(0) {
+        }
+        ~cu_info_header() {
+        }
+    };
+
+    // compile_unitから取得する情報
+    struct cu_info
+    {
+        // DW_AT_* info
+        std::string name;
+        std::string producer;
+        Dwarf_Unsigned language;
+        Dwarf_Off stmt_list;
+        std::string comp_dir;
+        std::optional<Dwarf_Unsigned> low_pc;
+        std::optional<Dwarf_Unsigned> high_pc;
+        Dwarf_Unsigned ranges;  // .debug_rangesへの参照
+
+        cu_info() : name(), producer(), language(), stmt_list(0), comp_dir(), low_pc(), high_pc() {
+        }
+        ~cu_info() {
+        }
+    };
+
     // 情報コンテナ
     template <typename T>
     class info_container {
@@ -264,6 +321,8 @@ struct dwarf_info
             return result.first->second;
         }
     };
+    // CompileUnitリスト
+    using cu_info_container = info_container<cu_info>;
     // 変数情報リスト
     using var_info_container = info_container<var_info>;
     // 型情報リスト
@@ -271,65 +330,12 @@ struct dwarf_info
     // 関数情報リスト
     using func_info_container = info_container<func_info>;
 
-    // compile_unitから取得する情報
-    struct cu_info
-    {
-        // compile_unit info
-        Dwarf_Unsigned cu_header_length;
-        Dwarf_Half version_stamp;
-        Dwarf_Off abbrev_offset;
-        Dwarf_Half address_size;
-        Dwarf_Half length_size;
-        Dwarf_Half extension_size;
-        Dwarf_Sig8 type_signature;
-        Dwarf_Unsigned typeoffset;
-        Dwarf_Unsigned next_cu_header_offset;
-        Dwarf_Half header_cu_type;
-        //
-        Dwarf_Off cu_offset;
-        Dwarf_Off cu_header_offset;
-        Dwarf_Off cu_length;
-        // DW_AT_* info
-        std::string name;
-        std::string producer;
-        Dwarf_Unsigned language;
-        Dwarf_Off stmt_list;
-        std::string comp_dir;
-        std::optional<Dwarf_Unsigned> low_pc;
-        std::optional<Dwarf_Unsigned> high_pc;
-        Dwarf_Unsigned ranges;  // .debug_rangesへの参照
-
-        cu_info()
-            : cu_header_length(0),
-              version_stamp(0),
-              abbrev_offset(0),
-              address_size(0),
-              length_size(0),
-              extension_size(0),
-              type_signature({0}),
-              typeoffset(0),
-              next_cu_header_offset(0),
-              header_cu_type(0),
-              cu_offset(0),
-              cu_header_offset(0),
-              cu_length(0),
-              name(),
-              producer(),
-              language(),
-              stmt_list(0),
-              comp_dir(),
-              low_pc(),
-              high_pc() {
-        }
-        ~cu_info() {
-        }
-    };
-
     // elf machine_architectureデータ
     elf::machine_architecture machine_arch;
     arch::arch_info *arch_info;
 
     // DIE解析情報
+    cu_info_container cu_tbl;
     var_info_container var_tbl;
     type_info_container type_tbl;
     func_info_container func_tbl;

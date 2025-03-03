@@ -120,8 +120,8 @@ public:
             // compile_unit取得
             // ヘッダ情報が一緒に返される
             // ★cu_infoは使い捨てている。必要に応じてinfo.cu_infoに保持する
-            analyze_info_.cu_info = dwarf_info::cu_info();
-            auto &cu_info         = analyze_info_.cu_info;
+            analyze_info_.cu_info_header = dwarf_info::cu_info_header();
+            auto &cu_info                = analyze_info_.cu_info_header;
             result = dwarf_next_cu_header_e(dw_dbg, dw_is_info, &dw_cu_die, &cu_info.cu_header_length, &cu_info.version_stamp, &cu_info.abbrev_offset,
                                             &cu_info.address_size, &cu_info.length_size, &cu_info.extension_size, &cu_info.type_signature,
                                             &cu_info.typeoffset, &cu_info.next_cu_header_offset, &cu_info.header_cu_type, &dw_error);
@@ -530,10 +530,10 @@ private:
             // file_listからこの変数が定義されたファイル名を取得できる
             info.decl_file_path = analyze_info_.file_list[info.decl_file];
             // 相対パスを作成
-            if (info.decl_file_path.find(analyze_info_.cu_info.comp_dir) == 0) {
+            if (info.decl_file_path.find(analyze_info_.cu_info->comp_dir) == 0) {
                 // comp_dirの末尾に区切り文字がおそらく付かないため、相対パスの先頭に区切り文字が残る
                 // コンパイラにより挙動が変わる可能性があるので、余計な加工をしないようにした
-                info.decl_file_path_rel = info.decl_file_path.substr(analyze_info_.cu_info.comp_dir.size());
+                info.decl_file_path_rel = info.decl_file_path.substr(analyze_info_.cu_info->comp_dir.size());
             }
         }
     }
@@ -552,11 +552,14 @@ private:
     // auto analyze_DW_TAG(Dwarf_Die die, die_info_t &die_info) -> std::enable_if_t<Tag == 0> {
     // }
 
-    void analyze_die_TAG_compile_unit(Dwarf_Die die, dwarf_info &) {
+    void analyze_die_TAG_compile_unit(Dwarf_Die die, dwarf_info &dw_info) {
+        // 変数情報作成
+        auto &&info           = dw_info.cu_tbl.make_new_info(analyze_info_.cu_info_header.cu_offset);
+        analyze_info_.cu_info = &info;
         // cu情報取得
-        analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, analyze_info_.cu_info);
+        analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, info);
         // comp_dir修正
-        fix_path_separator(analyze_info_.cu_info.comp_dir);
+        fix_path_separator(analyze_info_.cu_info->comp_dir);
     }
 
     Dwarf_Off analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {

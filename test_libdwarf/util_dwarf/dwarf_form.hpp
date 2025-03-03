@@ -219,11 +219,11 @@ dw_form_result_t get_DW_FORM(dwarf_analyze_info &info) {
                 T addr = ret->return_offset;
                 if (ret->is_info == true) {
                     // .debug_info のheader offsetを加算する
-                    addr += info.cu_info.cu_header_offset;
+                    addr += info.cu_info_header.cu_header_offset;
                 } else {
                     // .debug_types の先頭からのoffsetを加算する
                     // 暫定：debug_typesが出現することがあるか？
-                    addr += info.cu_info.cu_offset;
+                    addr += info.cu_info_header.cu_offset;
                 }
                 return dw_form_result_t(addr);
             }
