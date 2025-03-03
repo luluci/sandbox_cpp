@@ -76,7 +76,8 @@ public:
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
-        std::string *decl_file_name;
+        std::string *decl_file_path;
+        std::string *decl_file_path_rel;
         bool declaration;  // 不完全型のときtrue
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
@@ -90,7 +91,8 @@ public:
               decl_file(0),
               decl_line(0),
               decl_column(0),
-              decl_file_name(nullptr),
+              decl_file_path(nullptr),
+              decl_file_path_rel(nullptr),
               declaration(false),
               const_value(0),
               sibling(0),
@@ -103,16 +105,17 @@ public:
 
         void copy(dwarf_info::var_info &info) {
             // dwarf_infoから必要な情報をコピーする
-            name           = &(info.name);
-            external       = info.external;
-            decl_file      = info.decl_file;
-            decl_line      = info.decl_line;
-            decl_column    = info.decl_column;
-            decl_file_name = &(info.decl_file_name);
-            declaration    = info.declaration;
-            const_value    = info.const_value;
-            sibling        = info.sibling;
-            endianity      = info.endianity;
+            name               = &(info.name);
+            external           = info.external;
+            decl_file          = info.decl_file;
+            decl_line          = info.decl_line;
+            decl_column        = info.decl_column;
+            decl_file_path     = &(info.decl_file_path);
+            decl_file_path_rel = &(info.decl_file_path_rel);
+            declaration        = info.declaration;
+            const_value        = info.const_value;
+            sibling            = info.sibling;
+            endianity          = info.endianity;
             if (info.type)
                 type = *info.type;
             if (info.location)
@@ -134,7 +137,8 @@ public:
         Dwarf_Unsigned decl_file;  // filelistのインデックス
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
-        std::string *decl_file_name;
+        std::string *decl_file_path;
+        std::string *decl_file_path_rel;
         Dwarf_Unsigned encoding;  // DW_ATE_*
         Dwarf_Unsigned count;
         Dwarf_Unsigned address_class;
@@ -173,7 +177,8 @@ public:
               decl_file(0),
               decl_line(0),
               decl_column(0),
-              decl_file_name(nullptr),
+              decl_file_path(nullptr),
+              decl_file_path_rel(nullptr),
               encoding(0),
               count(0),
               address_class(0),
@@ -492,8 +497,11 @@ private:
         adapt_value(dbg_info.decl_line, dw_info.decl_line);
         adapt_value(dbg_info.decl_column, dw_info.decl_column);
         // 文字列情報
-        if (dbg_info.decl_file_name == nullptr && dw_info.decl_file_name.size() > 0) {
-            dbg_info.decl_file_name = &(dw_info.decl_file_name);
+        if (dbg_info.decl_file_path == nullptr && dw_info.decl_file_path.size() > 0) {
+            dbg_info.decl_file_path = &(dw_info.decl_file_path);
+        }
+        if (dbg_info.decl_file_path_rel == nullptr && dw_info.decl_file_path_rel.size() > 0) {
+            dbg_info.decl_file_path_rel = &(dw_info.decl_file_path_rel);
         }
     }
     void adapt_decl_info_force(type_info &dbg_info, dwarf_info::type_info &dw_info) {
@@ -502,8 +510,11 @@ private:
         adapt_value_force(dbg_info.decl_line, dw_info.decl_line);
         adapt_value_force(dbg_info.decl_column, dw_info.decl_column);
         // 文字列情報
-        if (dw_info.decl_file_name.size() > 0) {
-            dbg_info.decl_file_name = &(dw_info.decl_file_name);
+        if (dw_info.decl_file_path.size() > 0) {
+            dbg_info.decl_file_path = &(dw_info.decl_file_path);
+        }
+        if (dw_info.decl_file_path_rel.size() > 0) {
+            dbg_info.decl_file_path_rel = &(dw_info.decl_file_path_rel);
         }
     }
 
@@ -974,7 +985,7 @@ public:
         for (auto &[addr, func_info] : dw_func_tbl) {
             func_info_view view;
             view.tag_name           = &func_info.name;
-            view.tag_decl_file_name = &func_info.decl_file_name;
+            view.tag_decl_file_name = &func_info.decl_file_path;
             view.has_definition     = func_info.has_definition;
             view.is_declaration     = func_info.declaration;
             //
@@ -1050,11 +1061,11 @@ private:
         view.var_decl_file       = var.decl_file;
         view.var_decl_line       = var.decl_line;
         view.var_decl_column     = var.decl_column;
-        view.var_decl_file_name  = var.decl_file_name;
+        view.var_decl_file_name  = var.decl_file_path;
         view.type_decl_file      = type.decl_file;
         view.type_decl_line      = type.decl_line;
         view.type_decl_column    = type.decl_column;
-        view.type_decl_file_name = type.decl_file_name;
+        view.type_decl_file_name = type.decl_file_path;
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
@@ -1129,11 +1140,11 @@ private:
         view.var_decl_file       = member.decl_file;
         view.var_decl_line       = member.decl_line;
         view.var_decl_column     = member.decl_column;
-        view.var_decl_file_name  = member.decl_file_name;
+        view.var_decl_file_name  = member.decl_file_path;
         view.type_decl_file      = type.decl_file;
         view.type_decl_line      = type.decl_line;
         view.type_decl_column    = type.decl_column;
-        view.type_decl_file_name = type.decl_file_name;
+        view.type_decl_file_name = type.decl_file_path;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();

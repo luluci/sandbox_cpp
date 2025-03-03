@@ -340,7 +340,10 @@ private:
             //     propernumber = i + 1;
             // }
             // fprintf(stderr, "File %4ld %s\n", static_cast<unsigned long>(propernumber), srcfiles[i]);
+            // ファイルリストに登録
             analyze_info_.file_list.push_back(srcfiles[i]);
+            // 追加したパスを修正
+            fix_path_separator(analyze_info_.file_list.back());
 
             dwarf_dealloc(dw_dbg, srcfiles[i], DW_DLA_STRING);
             srcfiles[i] = 0;
@@ -525,7 +528,22 @@ private:
         // decl_fileチェック
         if (0 < info.decl_file && info.decl_file < analyze_info_.file_list.size()) {
             // file_listからこの変数が定義されたファイル名を取得できる
-            info.decl_file_name = analyze_info_.file_list[info.decl_file];
+            info.decl_file_path = analyze_info_.file_list[info.decl_file];
+            // 相対パスを作成
+            if (info.decl_file_path.find(analyze_info_.cu_info.comp_dir) == 0) {
+                // comp_dirの末尾に区切り文字がおそらく付かないため、相対パスの先頭に区切り文字が残る
+                // コンパイラにより挙動が変わる可能性があるので、余計な加工をしないようにした
+                info.decl_file_path_rel = info.decl_file_path.substr(analyze_info_.cu_info.comp_dir.size());
+            }
+        }
+    }
+
+    void fix_path_separator(std::string &path) {
+        // Windowsパス区切り文字に修正
+        for (size_t pos = 0; pos < path.size(); ++pos) {
+            if (path[pos] == '/') {
+                path[pos] = '\\';
+            }
         }
     }
 
@@ -537,6 +555,8 @@ private:
     void analyze_die_TAG_compile_unit(Dwarf_Die die, dwarf_info &) {
         // cu情報取得
         analyze_DW_AT<DW_TAG_compile_unit>(die, analyze_info_, analyze_info_.cu_info);
+        // comp_dir修正
+        fix_path_separator(analyze_info_.cu_info.comp_dir);
     }
 
     Dwarf_Off analyze_DW_TAG_variable(Dwarf_Die die, dwarf_info &dw_info, die_info_t &die_info) {

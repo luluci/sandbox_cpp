@@ -47,7 +47,8 @@ struct dwarf_info
         std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
 
         // 付加情報
-        std::string decl_file_name;
+        std::string decl_file_path;
+        std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool is_parameter;
         bool is_local_var;
 
@@ -65,7 +66,8 @@ struct dwarf_info
               sibling(0),
               endianity(0),
               specification(),
-              decl_file_name(),
+              decl_file_path(),
+              decl_file_path_rel(),
               is_parameter(false),
               is_local_var(false) {
         }
@@ -147,7 +149,8 @@ struct dwarf_info
         func_list_t member_func_list;
 
         // 付加情報
-        std::string decl_file_name;
+        std::string decl_file_path;
+        std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool has_bitfield;
 
         type_info()
@@ -173,7 +176,8 @@ struct dwarf_info
               artificial(false),
               child_list(),
               param_list(),
-              decl_file_name(),
+              decl_file_path(),
+              decl_file_path_rel(),
               has_bitfield(false) {
         }
         ~type_info() {
@@ -208,8 +212,9 @@ struct dwarf_info
         var_list_t local_var_list;
 
         // 付加情報
-        std::string decl_file_name;
-        bool has_definition;  // 関数定義あり？
+        std::string decl_file_path;
+        std::string decl_file_path_rel;  // comp_dirからの相対パス
+        bool has_definition;             // 関数定義あり？
 
         func_info()
             : name(),
@@ -231,7 +236,8 @@ struct dwarf_info
               specification(),
               param_list(),
               local_var_list(),
-              decl_file_name(),
+              decl_file_path(),
+              decl_file_path_rel(),
               has_definition(false) {
         }
         ~func_info() {
