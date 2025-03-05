@@ -378,6 +378,18 @@ void get_DW_AT_endianity(dwarf_analyze_info &dw_info, T &info) {
     }
 }
 
+// DW_AT_use_UTF8 実装
+template <Dwarf_Half DW_TAG, typename T>
+void get_DW_AT_use_UTF8(dwarf_analyze_info &dw_info, T &info) {
+    Dwarf_Bool returned_bool = 0;
+    int result;
+    result = dwarf_formflag(dw_info.dw_attr, &returned_bool, &dw_info.dw_error);
+    if (result != DW_DLV_OK) {
+        utility::error_happen(&dw_info.dw_error);
+    }
+    info.use_UTF8 = (returned_bool == 1);
+}
+
 // DW_AT_ranges
 template <Dwarf_Half DW_TAG, typename T>
 void get_DW_AT_ranges(dwarf_analyze_info &dw_info, T &info) {
@@ -679,7 +691,14 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
         case DW_AT_data_location:
         case DW_AT_byte_stride:
         case DW_AT_entry_pc:
+            break;
+
         case DW_AT_use_UTF8:
+            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+                get_DW_AT_use_UTF8<DW_TAG>(dw_info, info);
+            }
+            return;
+
         case DW_AT_extension:
             break;
 

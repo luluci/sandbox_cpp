@@ -293,9 +293,10 @@ struct dwarf_info
         std::string comp_dir;
         std::optional<Dwarf_Unsigned> low_pc;
         std::optional<Dwarf_Unsigned> high_pc;
+        bool use_UTF8;
         Dwarf_Unsigned ranges;  // .debug_rangesへの参照
 
-        cu_info() : name(), producer(), language(), stmt_list(0), comp_dir(), low_pc(), high_pc() {
+        cu_info() : name(), producer(), language(), stmt_list(0), comp_dir(), low_pc(), high_pc(), use_UTF8(false), ranges(0) {
         }
         ~cu_info() {
         }
