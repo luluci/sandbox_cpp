@@ -29,6 +29,64 @@ using block = std::vector<uint8_t>;
 
 struct dwarf_info
 {
+    // compile_unitから取得する情報
+    struct cu_info_header
+    {
+        // compile_unit info
+        Dwarf_Unsigned cu_header_length;
+        Dwarf_Half version_stamp;
+        Dwarf_Off abbrev_offset;
+        Dwarf_Half address_size;
+        Dwarf_Half length_size;
+        Dwarf_Half extension_size;
+        Dwarf_Sig8 type_signature;
+        Dwarf_Unsigned typeoffset;
+        Dwarf_Unsigned next_cu_header_offset;
+        Dwarf_Half header_cu_type;
+        //
+        Dwarf_Off cu_offset;
+        Dwarf_Off cu_header_offset;
+        Dwarf_Off cu_length;
+
+        cu_info_header()
+            : cu_header_length(0),
+              version_stamp(0),
+              abbrev_offset(0),
+              address_size(0),
+              length_size(0),
+              extension_size(0),
+              type_signature({0}),
+              typeoffset(0),
+              next_cu_header_offset(0),
+              header_cu_type(0),
+              cu_offset(0),
+              cu_header_offset(0),
+              cu_length(0) {
+        }
+        ~cu_info_header() {
+        }
+    };
+
+    // compile_unitから取得する情報
+    struct compile_unit_info
+    {
+        // DW_AT_* info
+        std::string name;
+        std::string producer;
+        Dwarf_Unsigned language;
+        Dwarf_Off stmt_list;
+        std::string comp_dir;
+        std::optional<Dwarf_Unsigned> low_pc;
+        std::optional<Dwarf_Unsigned> high_pc;
+        bool use_UTF8;
+        Dwarf_Unsigned ranges;  // .debug_rangesへの参照
+
+        compile_unit_info() : name(), producer(), language(), stmt_list(0), comp_dir(), low_pc(), high_pc(), use_UTF8(false), ranges(0) {
+        }
+        ~compile_unit_info() {
+        }
+    };
+
     // 変数情報
     struct var_info
     {
@@ -47,6 +105,7 @@ struct dwarf_info
         std::optional<Dwarf_Off> specification;  // 分割定義offset, offsetが指すDIEに情報を付与する
 
         // 付加情報
+        compile_unit_info *cu_info;
         std::string decl_file_path;
         std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool is_parameter;
@@ -149,6 +208,7 @@ struct dwarf_info
         func_list_t member_func_list;
 
         // 付加情報
+        compile_unit_info *cu_info;
         std::string decl_file_path;
         std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool has_bitfield;
@@ -212,6 +272,7 @@ struct dwarf_info
         var_list_t local_var_list;
 
         // 付加情報
+        compile_unit_info *cu_info;
         std::string decl_file_path;
         std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool has_definition;             // 関数定義あり？
@@ -244,64 +305,6 @@ struct dwarf_info
         }
     };
 
-    // compile_unitから取得する情報
-    struct cu_info_header
-    {
-        // compile_unit info
-        Dwarf_Unsigned cu_header_length;
-        Dwarf_Half version_stamp;
-        Dwarf_Off abbrev_offset;
-        Dwarf_Half address_size;
-        Dwarf_Half length_size;
-        Dwarf_Half extension_size;
-        Dwarf_Sig8 type_signature;
-        Dwarf_Unsigned typeoffset;
-        Dwarf_Unsigned next_cu_header_offset;
-        Dwarf_Half header_cu_type;
-        //
-        Dwarf_Off cu_offset;
-        Dwarf_Off cu_header_offset;
-        Dwarf_Off cu_length;
-
-        cu_info_header()
-            : cu_header_length(0),
-              version_stamp(0),
-              abbrev_offset(0),
-              address_size(0),
-              length_size(0),
-              extension_size(0),
-              type_signature({0}),
-              typeoffset(0),
-              next_cu_header_offset(0),
-              header_cu_type(0),
-              cu_offset(0),
-              cu_header_offset(0),
-              cu_length(0) {
-        }
-        ~cu_info_header() {
-        }
-    };
-
-    // compile_unitから取得する情報
-    struct cu_info
-    {
-        // DW_AT_* info
-        std::string name;
-        std::string producer;
-        Dwarf_Unsigned language;
-        Dwarf_Off stmt_list;
-        std::string comp_dir;
-        std::optional<Dwarf_Unsigned> low_pc;
-        std::optional<Dwarf_Unsigned> high_pc;
-        bool use_UTF8;
-        Dwarf_Unsigned ranges;  // .debug_rangesへの参照
-
-        cu_info() : name(), producer(), language(), stmt_list(0), comp_dir(), low_pc(), high_pc(), use_UTF8(false), ranges(0) {
-        }
-        ~cu_info() {
-        }
-    };
-
     // 情報コンテナ
     template <typename T>
     class info_container {
@@ -323,7 +326,7 @@ struct dwarf_info
         }
     };
     // CompileUnitリスト
-    using cu_info_container = info_container<cu_info>;
+    using cu_info_container = info_container<compile_unit_info>;
     // 変数情報リスト
     using var_info_container = info_container<var_info>;
     // 型情報リスト

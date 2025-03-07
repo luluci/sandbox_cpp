@@ -525,6 +525,10 @@ private:
 
     template <typename T>
     void analyze_extra_info(T &info) {
+        // CumpileUnit情報
+        if (analyze_info_.cu_info != nullptr) {
+            info.cu_info = analyze_info_.cu_info;
+        }
         // decl_fileチェック
         if (0 < info.decl_file && info.decl_file < analyze_info_.file_list.size()) {
             // file_listからこの変数が定義されたファイル名を取得できる

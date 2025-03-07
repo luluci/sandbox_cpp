@@ -458,7 +458,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
     // Attrubute解析
     switch (attrnum) {
         case DW_AT_sibling:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_sibling<DW_TAG>(dw_info, info);
             }
             return;
@@ -494,25 +494,25 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
         case DW_AT_element_list:
             break;
         case DW_AT_stmt_list:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_stmt_list<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_low_pc:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info> || std::is_same_v<T, dwarf_info::func_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info> || std::is_same_v<T, dwarf_info::func_info>) {
                 get_DW_AT_low_pc<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_high_pc:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info> || std::is_same_v<T, dwarf_info::func_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info> || std::is_same_v<T, dwarf_info::func_info>) {
                 get_DW_AT_high_pc<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_language:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_language<DW_TAG>(dw_info, info);
             }
             return;
@@ -527,7 +527,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             break;
 
         case DW_AT_comp_dir:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_comp_dir<DW_TAG>(dw_info, info);
             }
             return;
@@ -551,7 +551,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_producer:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_producer<DW_TAG>(dw_info, info);
             }
             return;
@@ -617,23 +617,23 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             return;
 
         case DW_AT_decl_column:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_decl_column<DW_TAG>(dw_info, info);
             }
             return;
         case DW_AT_decl_file:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_decl_file<DW_TAG>(dw_info, info);
             }
             return;
         case DW_AT_decl_line:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_decl_line<DW_TAG>(dw_info, info);
             }
             return;
 
         case DW_AT_declaration:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_declaration<DW_TAG>(dw_info, info);
             }
             return;
@@ -677,7 +677,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             break;
 
         case DW_AT_type:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_type<DW_TAG>(dw_info, info);
             }
             return;
@@ -694,7 +694,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             break;
 
         case DW_AT_use_UTF8:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_use_UTF8<DW_TAG>(dw_info, info);
             }
             return;
@@ -703,7 +703,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             break;
 
         case DW_AT_ranges:
-            if constexpr (std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_ranges<DW_TAG>(dw_info, info);
             }
             return;
@@ -733,7 +733,7 @@ void analyze_DW_AT_impl(Dwarf_Attribute dw_attr, Dwarf_Half attrnum, dwarf_analy
             break;
 
         case DW_AT_endianity:
-            if constexpr (!std::is_same_v<T, dwarf_info::cu_info>) {
+            if constexpr (!std::is_same_v<T, dwarf_info::compile_unit_info>) {
                 get_DW_AT_endianity<DW_TAG>(dw_info, info);
             }
             return;

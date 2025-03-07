@@ -84,6 +84,7 @@ public:
         Dwarf_Unsigned endianity;  // DW_END_*
         std::optional<dw_op_value *> location;
         std::optional<Dwarf_Off> type;  // reference
+        dwarf_info::compile_unit_info *cu_info;
 
         var_info()
             : name(nullptr),
@@ -98,7 +99,8 @@ public:
               sibling(0),
               endianity(0),
               location(),
-              type() {
+              type(),
+              cu_info(nullptr) {
         }
         ~var_info() {
         }
@@ -120,6 +122,8 @@ public:
                 type = *info.type;
             if (info.location)
                 location = &(*info.location);
+            if (info.cu_info != nullptr)
+                cu_info = info.cu_info;
         }
     };
 
@@ -144,6 +148,7 @@ public:
         Dwarf_Unsigned address_class;
         Dwarf_Unsigned pointer_depth;
         std::optional<Dwarf_Off> type;  // reference
+        dwarf_info::compile_unit_info *cu_info;
 
         bool is_const;
         bool is_restrict;
@@ -184,6 +189,7 @@ public:
               address_class(0),
               pointer_depth(0),
               type(),
+              cu_info(nullptr),
               is_const(false),
               is_restrict(false),
               is_volatile(false),
@@ -390,6 +396,8 @@ private:
     }
 
     bool adapt_info(type_info &dbg_info, dwarf_info::type_info &dw_info) {
+        // CumpileUnit情報
+        adapt_value(dbg_info.cu_info, dw_info.cu_info);
         // type情報
         adapt_value(dbg_info.type, dw_info.type);
         // decl_*情報
@@ -805,6 +813,11 @@ private:
         return true;
     }
 
+    void adapt_value(dwarf_info::compile_unit_info *&dst, dwarf_info::compile_unit_info *&src) {
+        if (dst == nullptr && src != nullptr) {
+            dst = src;
+        }
+    }
     void adapt_value(std::string *&dst, std::string &src) {
         if (dst == nullptr && src.size() > 0) {
             dst = &src;
@@ -885,6 +898,8 @@ public:
         Dwarf_Unsigned type_decl_column;
         std::string *type_decl_file_path;
         std::string *type_decl_file_path_rel;
+        //
+        dwarf_info::compile_unit_info *cu_info;
 
         size_t pointer_depth;
         bool is_struct;
@@ -919,6 +934,7 @@ public:
               type_decl_column(0),
               type_decl_file_path(nullptr),
               type_decl_file_path_rel(nullptr),
+              cu_info(nullptr),
               pointer_depth(0),
               is_struct(false),
               is_union(false),
@@ -971,6 +987,7 @@ public:
         std::string *tag_name;
         std::string *tag_decl_file_path;
         std::string *tag_decl_file_path_rel;
+        dwarf_info::compile_unit_info *cu_info;
 
         Dwarf_Unsigned low_pc;
         Dwarf_Unsigned high_pc;
@@ -982,6 +999,7 @@ public:
               tag_name(nullptr),
               tag_decl_file_path(nullptr),
               tag_decl_file_path_rel(nullptr),
+              cu_info(nullptr),
               low_pc(0),
               high_pc(0),
               is_declaration(false),
@@ -999,6 +1017,7 @@ public:
             view.tag_name               = &func_info.name;
             view.tag_decl_file_path     = &func_info.decl_file_path;
             view.tag_decl_file_path_rel = &func_info.decl_file_path_rel;
+            view.cu_info                = func_info.cu_info;
             view.has_definition         = func_info.has_definition;
             view.is_declaration         = func_info.declaration;
             //
@@ -1081,6 +1100,8 @@ private:
         view.type_decl_column        = type.decl_column;
         view.type_decl_file_path     = type.decl_file_path;
         view.type_decl_file_path_rel = type.decl_file_path_rel;
+        //
+        view.cu_info = var.cu_info;
 
         if ((type.tag & util_dwarf::debug_info::type_tag::array) != 0) {
             // 配列のとき
@@ -1162,6 +1183,8 @@ private:
         view.type_decl_column        = type.decl_column;
         view.type_decl_file_path     = type.decl_file_path;
         view.type_decl_file_path_rel = type.decl_file_path_rel;
+        //
+        view.cu_info = member.cu_info;
 
         // prefix部分の末尾を記憶しておく
         auto org_end = var_name.size();
