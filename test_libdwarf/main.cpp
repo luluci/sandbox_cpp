@@ -266,6 +266,16 @@ int main(int argc, char *argv[]) {
             int typelen = static_cast<int>(debug_info.max_typename_len);
 
             debug_info.get_var_info([typelen](util_dwarf::debug_info::var_info_view &view) -> bool {
+                // 相対パスを作成
+                std::string decl_file_path_rel;
+                if (view.var_decl_file_path != nullptr && view.cu_info != nullptr) {
+                    if (view.var_decl_file_path->find(view.cu_info->comp_dir) == 0) {
+                        // comp_dirの末尾に区切り文字がおそらく付かないため、相対パスの先頭に区切り文字が残る
+                        // コンパイラにより挙動が変わる可能性があるので、余計な加工をしないようにした
+                        decl_file_path_rel = view.var_decl_file_path->substr(view.cu_info->comp_dir.size());
+                    }
+                }
+                //
                 printf("0x%08llX %*s\t%lld\t%s\t[", view.address, typelen, view.tag_type->c_str(), view.byte_size, view.tag_name->c_str());
                 if (view.is_array) {
                     printf("array, ");

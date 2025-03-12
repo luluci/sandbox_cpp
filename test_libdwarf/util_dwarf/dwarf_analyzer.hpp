@@ -533,6 +533,7 @@ private:
         if (0 < info.decl_file && info.decl_file < analyze_info_.file_list.size()) {
             // file_listからこの変数が定義されたファイル名を取得できる
             info.decl_file_path = analyze_info_.file_list[info.decl_file];
+            // MARK: パス文字列はエンコーディングの問題があるのでここでは作成しない
             // 相対パスを作成
             if (info.decl_file_path.find(analyze_info_.cu_info->comp_dir) == 0) {
                 // comp_dirの末尾に区切り文字がおそらく付かないため、相対パスの先頭に区切り文字が残る
