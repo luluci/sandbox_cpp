@@ -4,15 +4,14 @@ project(test_libdwarf CXX)
 
 # dllを結合するとき：-static -lgcc -lstdc++ -lz -lzstd
 # より最適化するとき： -s -march=native
-set(CMAKE_CXX_FLAGS "-std=gnu++20 -static -lgcc -lstdc++ -Wall -Wextra -pedantic -Wcast-align -Wcast-qual -Wconversion -Wdisabled-optimization -Wendif-labels -Wfloat-equal -Winit-self -Winline -Wlogical-op -Wmissing-include-dirs -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wpacked -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-promo -Wswitch-default -Wswitch-enum -Wunsafe-loop-optimizations -Wvariadic-macros -Wwrite-strings ")
-set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0 -pg")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g3 -Og -pg")
-set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os -DNDEBUG")
+#set(CMAKE_CXX_FLAGS "-static -lgcc -lstdc++ -Wall -Wextra -pedantic -Wcast-align -Wcast-qual -Wconversion -Wdisabled-optimization -Wendif-labels -Wfloat-equal -Winit-self -Winline -Wlogical-op -Wmissing-include-dirs -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wpacked -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-promo -Wswitch-default -Wswitch-enum -Wunsafe-loop-optimizations -Wvariadic-macros -Wwrite-strings ")
+#set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0 -pg")
+#set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+#set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g3 -Og -pg")
+#set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os -DNDEBUG")
 # set(CMAKE_BUILD_TYPE Debug)
 
 # 変数
-#set(LIBDWARF_DIR D:/msys64/usr/local/libdwarf_092)
 set(LIBDWARF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/libdwarf)
 set(LINKLIB_DIR D:/msys64/ucrt64/lib)
 #
@@ -47,7 +46,19 @@ set_target_properties(libzstd PROPERTIES
 
 #
 add_executable(test_libdwarf main.cpp)
+target_compile_features(test_libdwarf PUBLIC cxx_std_20)
+target_compile_options(test_libdwarf PUBLIC
+    -Wall -Wextra -pedantic -Wcast-align -Wcast-qual -Wconversion -Wdisabled-optimization -Wendif-labels -Wfloat-equal -Winit-self -Winline -Wlogical-op -Wmissing-include-dirs -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wpacked -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-promo -Wswitch-default -Wswitch-enum -Wunsafe-loop-optimizations -Wvariadic-macros -Wwrite-strings
+    $<$<CONFIG:Release>: -O2 -DNDEBUG>
+    $<$<CONFIG:Debug>: -pg -g3 -O0>
+)
+target_link_options(test_libdwarf PUBLIC
+    -static -lgcc -lstdc++
+    $<$<CONFIG:Debug>: -pg -g3>
+)
+#
 target_link_libraries(test_libdwarf libdwarf libz libzstd)
+
 #target_include_directories(test_libdwarf ${LIBDWARF_DIR}/include)
 #
 set_target_properties(test_libdwarf PROPERTIES
