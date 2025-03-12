@@ -107,7 +107,6 @@ struct dwarf_info
         // 付加情報
         compile_unit_info *cu_info;
         std::string decl_file_path;
-        std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool is_parameter;
         bool is_local_var;
 
@@ -126,7 +125,6 @@ struct dwarf_info
               endianity(0),
               specification(),
               decl_file_path(),
-              decl_file_path_rel(),
               is_parameter(false),
               is_local_var(false) {
         }
@@ -210,7 +208,6 @@ struct dwarf_info
         // 付加情報
         compile_unit_info *cu_info;
         std::string decl_file_path;
-        std::string decl_file_path_rel;  // comp_dirからの相対パス
         bool has_bitfield;
 
         type_info()
@@ -237,7 +234,6 @@ struct dwarf_info
               child_list(),
               param_list(),
               decl_file_path(),
-              decl_file_path_rel(),
               has_bitfield(false) {
         }
         ~type_info() {
@@ -274,8 +270,7 @@ struct dwarf_info
         // 付加情報
         compile_unit_info *cu_info;
         std::string decl_file_path;
-        std::string decl_file_path_rel;  // comp_dirからの相対パス
-        bool has_definition;             // 関数定義あり？
+        bool has_definition;  // 関数定義あり？
 
         func_info()
             : name(),
@@ -298,7 +293,6 @@ struct dwarf_info
               param_list(),
               local_var_list(),
               decl_file_path(),
-              decl_file_path_rel(),
               has_definition(false) {
         }
         ~func_info() {

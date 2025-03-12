@@ -77,7 +77,6 @@ public:
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         std::string *decl_file_path;
-        std::string *decl_file_path_rel;
         bool declaration;  // 不完全型のときtrue
         Dwarf_Unsigned const_value;
         Dwarf_Unsigned sibling;
@@ -93,7 +92,6 @@ public:
               decl_line(0),
               decl_column(0),
               decl_file_path(nullptr),
-              decl_file_path_rel(nullptr),
               declaration(false),
               const_value(0),
               sibling(0),
@@ -107,17 +105,16 @@ public:
 
         void copy(dwarf_info::var_info &info) {
             // dwarf_infoから必要な情報をコピーする
-            name               = &(info.name);
-            external           = info.external;
-            decl_file          = info.decl_file;
-            decl_line          = info.decl_line;
-            decl_column        = info.decl_column;
-            decl_file_path     = &(info.decl_file_path);
-            decl_file_path_rel = &(info.decl_file_path_rel);
-            declaration        = info.declaration;
-            const_value        = info.const_value;
-            sibling            = info.sibling;
-            endianity          = info.endianity;
+            name           = &(info.name);
+            external       = info.external;
+            decl_file      = info.decl_file;
+            decl_line      = info.decl_line;
+            decl_column    = info.decl_column;
+            decl_file_path = &(info.decl_file_path);
+            declaration    = info.declaration;
+            const_value    = info.const_value;
+            sibling        = info.sibling;
+            endianity      = info.endianity;
             if (info.type)
                 type = *info.type;
             if (info.location)
@@ -142,7 +139,6 @@ public:
         Dwarf_Unsigned decl_line;
         Dwarf_Unsigned decl_column;
         std::string *decl_file_path;
-        std::string *decl_file_path_rel;
         Dwarf_Unsigned encoding;  // DW_ATE_*
         Dwarf_Unsigned count;
         Dwarf_Unsigned address_class;
@@ -183,7 +179,6 @@ public:
               decl_line(0),
               decl_column(0),
               decl_file_path(nullptr),
-              decl_file_path_rel(nullptr),
               encoding(0),
               count(0),
               address_class(0),
@@ -508,9 +503,6 @@ private:
         if (dbg_info.decl_file_path == nullptr && dw_info.decl_file_path.size() > 0) {
             dbg_info.decl_file_path = &(dw_info.decl_file_path);
         }
-        if (dbg_info.decl_file_path_rel == nullptr && dw_info.decl_file_path_rel.size() > 0) {
-            dbg_info.decl_file_path_rel = &(dw_info.decl_file_path_rel);
-        }
     }
     void adapt_decl_info_force(type_info &dbg_info, dwarf_info::type_info &dw_info) {
         // decl_*情報
@@ -520,9 +512,6 @@ private:
         // 文字列情報
         if (dw_info.decl_file_path.size() > 0) {
             dbg_info.decl_file_path = &(dw_info.decl_file_path);
-        }
-        if (dw_info.decl_file_path_rel.size() > 0) {
-            dbg_info.decl_file_path_rel = &(dw_info.decl_file_path_rel);
         }
     }
 
@@ -892,12 +881,10 @@ public:
         Dwarf_Unsigned var_decl_line;
         Dwarf_Unsigned var_decl_column;
         std::string *var_decl_file_path;
-        std::string *var_decl_file_path_rel;
         Dwarf_Unsigned type_decl_file;
         Dwarf_Unsigned type_decl_line;
         Dwarf_Unsigned type_decl_column;
         std::string *type_decl_file_path;
-        std::string *type_decl_file_path_rel;
         //
         dwarf_info::compile_unit_info *cu_info;
 
@@ -928,12 +915,10 @@ public:
               var_decl_line(0),
               var_decl_column(0),
               var_decl_file_path(nullptr),
-              var_decl_file_path_rel(nullptr),
               type_decl_file(0),
               type_decl_line(0),
               type_decl_column(0),
               type_decl_file_path(nullptr),
-              type_decl_file_path_rel(nullptr),
               cu_info(nullptr),
               pointer_depth(0),
               is_struct(false),
@@ -986,7 +971,6 @@ public:
         std::string *tag_type;
         std::string *tag_name;
         std::string *tag_decl_file_path;
-        std::string *tag_decl_file_path_rel;
         dwarf_info::compile_unit_info *cu_info;
 
         Dwarf_Unsigned low_pc;
@@ -998,7 +982,6 @@ public:
             : tag_type(nullptr),
               tag_name(nullptr),
               tag_decl_file_path(nullptr),
-              tag_decl_file_path_rel(nullptr),
               cu_info(nullptr),
               low_pc(0),
               high_pc(0),
@@ -1014,12 +997,11 @@ public:
         auto &dw_func_tbl = dw_info_.func_tbl.container;
         for (auto &[addr, func_info] : dw_func_tbl) {
             func_info_view view;
-            view.tag_name               = &func_info.name;
-            view.tag_decl_file_path     = &func_info.decl_file_path;
-            view.tag_decl_file_path_rel = &func_info.decl_file_path_rel;
-            view.cu_info                = func_info.cu_info;
-            view.has_definition         = func_info.has_definition;
-            view.is_declaration         = func_info.declaration;
+            view.tag_name           = &func_info.name;
+            view.tag_decl_file_path = &func_info.decl_file_path;
+            view.cu_info            = func_info.cu_info;
+            view.has_definition     = func_info.has_definition;
+            view.is_declaration     = func_info.declaration;
             //
             result = func(view);
             if (!result) {
@@ -1090,16 +1072,14 @@ private:
         view.tag_name = &var_name;
         view.is_const = type.is_const;
         // decl_*
-        view.var_decl_file           = var.decl_file;
-        view.var_decl_line           = var.decl_line;
-        view.var_decl_column         = var.decl_column;
-        view.var_decl_file_path      = var.decl_file_path;
-        view.var_decl_file_path_rel  = var.decl_file_path_rel;
-        view.type_decl_file          = type.decl_file;
-        view.type_decl_line          = type.decl_line;
-        view.type_decl_column        = type.decl_column;
-        view.type_decl_file_path     = type.decl_file_path;
-        view.type_decl_file_path_rel = type.decl_file_path_rel;
+        view.var_decl_file       = var.decl_file;
+        view.var_decl_line       = var.decl_line;
+        view.var_decl_column     = var.decl_column;
+        view.var_decl_file_path  = var.decl_file_path;
+        view.type_decl_file      = type.decl_file;
+        view.type_decl_line      = type.decl_line;
+        view.type_decl_column    = type.decl_column;
+        view.type_decl_file_path = type.decl_file_path;
         //
         view.cu_info = var.cu_info;
 
@@ -1173,16 +1153,14 @@ private:
         view.is_union_member  = is_struct_union;
         view.is_const         = type.is_const;
         // decl_*
-        view.var_decl_file           = member.decl_file;
-        view.var_decl_line           = member.decl_line;
-        view.var_decl_column         = member.decl_column;
-        view.var_decl_file_path      = member.decl_file_path;
-        view.var_decl_file_path_rel  = member.decl_file_path_rel;
-        view.type_decl_file          = type.decl_file;
-        view.type_decl_line          = type.decl_line;
-        view.type_decl_column        = type.decl_column;
-        view.type_decl_file_path     = type.decl_file_path;
-        view.type_decl_file_path_rel = type.decl_file_path_rel;
+        view.var_decl_file       = member.decl_file;
+        view.var_decl_line       = member.decl_line;
+        view.var_decl_column     = member.decl_column;
+        view.var_decl_file_path  = member.decl_file_path;
+        view.type_decl_file      = type.decl_file;
+        view.type_decl_line      = type.decl_line;
+        view.type_decl_column    = type.decl_column;
+        view.type_decl_file_path = type.decl_file_path;
         //
         view.cu_info = member.cu_info;
 
